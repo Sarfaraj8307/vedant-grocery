@@ -143,6 +143,10 @@ class OrderRepositoryCacheTest {
         override suspend fun restoreOrderItem(itemId: String) = Unit
         override suspend fun ensureDeliverySlots(from: String, days: Int) = Unit
         override suspend fun deliveryOrders(onlyMine: Boolean): List<DeliveryOrderDto> = emptyList()
+        override suspend fun isAcceptingOrders(): Boolean? = true
+
+        override suspend fun setOrderAcceptance(accepting: Boolean, reason: String?) = Unit
+
         override suspend fun adminSlotLoad(from: String, days: Int): List<SlotLoadDto> = emptyList()
     }
 }

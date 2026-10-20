@@ -49,3 +49,7 @@ next-env.d.ts
 # Kept out of git so a stray note can never become a committed secret.
 # Unanchored on purpose: this matches at any depth, including nested projects.
 .workbuddy-ai/
+
+# Kotlin/Gradle build noise
+.kotlin/
+*.hprof

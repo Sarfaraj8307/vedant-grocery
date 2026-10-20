@@ -8,6 +8,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vedant.admin.ui.components.DestructiveButton
+import com.vedant.admin.ui.components.SectionCard
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -39,6 +51,7 @@ import com.vedant.admin.ui.theme.VedantTheme
  */
 @Composable
 fun DashboardScreen(
+    factory: ViewModelProvider.Factory,
     email: String?,
     onOpenOrders: () -> Unit,
     onOpenDelivery: () -> Unit,
@@ -52,6 +65,11 @@ fun DashboardScreen(
 ) {
     val spacing = VedantTheme.spacing
     val radius = VedantTheme.radius
+
+    val viewModel: DashboardViewModel = viewModel(factory = factory)
+    val dash by viewModel.uiState.collectAsStateWithLifecycle()
+    var stopReason by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) { viewModel.start() }
 
     Column(modifier = modifier.fillMaxSize()) {
         VedantTopBar(
@@ -106,6 +124,67 @@ fun DashboardScreen(
                 leadingIcon = Icons.AutoMirrored.Outlined.ReceiptLong,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            SectionCard(title = "Order acceptance") {
+                Text(
+                    text = when (dash.accepting) {
+                        true -> "Accepting orders"
+                        false -> "Not accepting orders"
+                        null -> "Status unknown — could not read the store"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = when (dash.accepting) {
+                        true -> MaterialTheme.colorScheme.primary
+                        false -> MaterialTheme.colorScheme.error
+                        null -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                Text(
+                    text = "Closing stops NEW orders immediately. Existing orders, " +
+                        "delivery and support keep working.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.size(spacing.xs))
+
+                if (dash.accepting == false) {
+                    PrimaryButton(
+                        text = "Start taking orders",
+                        onClick = { viewModel.setAccepting(true, null) },
+                        isInFlight = dash.isSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = stopReason,
+                        onValueChange = { stopReason = it },
+                        label = { Text("Reason (required)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.size(spacing.xxs))
+                    DestructiveButton(
+                        text = "Stop taking orders",
+                        onClick = { viewModel.setAccepting(false, stopReason) },
+                        isInFlight = dash.isSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                dash.message?.let { msg ->
+                    Spacer(Modifier.size(spacing.xxs))
+                    Text(
+                        text = msg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (dash.messageIsError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    )
+                }
+            }
 
             SecondaryButton(
                 text = "My deliveries",

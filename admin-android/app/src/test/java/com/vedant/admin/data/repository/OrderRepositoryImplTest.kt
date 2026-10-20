@@ -229,6 +229,10 @@ class OrderRepositoryImplTest {
         }
 
         override suspend fun deliveryOrders(onlyMine: Boolean): List<DeliveryOrderDto> = emptyList()
+        override suspend fun isAcceptingOrders(): Boolean? = true
+
+        override suspend fun setOrderAcceptance(accepting: Boolean, reason: String?) = Unit
+
         override suspend fun adminSlotLoad(from: String, days: Int): List<SlotLoadDto> {
             failure?.let { throw it }
             calls += "slotLoad:$from:$days"

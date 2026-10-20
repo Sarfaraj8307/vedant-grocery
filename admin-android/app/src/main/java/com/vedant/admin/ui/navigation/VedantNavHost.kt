@@ -93,6 +93,7 @@ fun VedantNavHost(
         }
         composable(Routes.DASHBOARD) {
             DashboardScreen(
+                factory = factory,
                 email = (sessionState as? SessionState.SignedIn)?.email,
                 onOpenOrders = { navController.navigate(Routes.orders()) },
                 onOpenDelivery = { navController.navigate(Routes.DELIVERY) },

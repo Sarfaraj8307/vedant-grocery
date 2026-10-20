@@ -68,6 +68,26 @@ interface AdminRpc {
      * flag for a `DELIVERY` caller, so a tampered client cannot widen its view.
      */
     suspend fun deliveryOrders(onlyMine: Boolean = true): List<DeliveryOrderDto>
+
+    /**
+     * Whether the store is currently taking new orders (§9).
+     *
+     * Reads `store_settings.is_open` — the same column `place_order` enforces.
+     * Returns `null` when it cannot be read, so the UI can say "unknown" instead
+     * of assuming "open" and letting an operator believe orders are live.
+     */
+    suspend fun isAcceptingOrders(): Boolean?
+
+    /**
+     * `admin_set_order_acceptance(p_accepting, p_reason)` — stop or resume trade.
+     *
+     * Server-authoritative: gated on `private.can_manage_store()`, requires a
+     * reason when closing, and writes `store_status_history` + `audit_logs`.
+     * The caller re-reads afterwards rather than assuming the new state.
+     */
+    suspend fun setOrderAcceptance(accepting: Boolean, reason: String?)
+
+
 }
 
 /** The real implementation, backed by the `public.admin_*` RPCs. */
@@ -136,4 +156,32 @@ class SupabaseAdminRpc(private val client: SupabaseClient) : AdminRpc {
                 put("p_only_mine", onlyMine)
             },
         ).decodeList()
+
+
+    override suspend fun isAcceptingOrders(): Boolean? = runCatching {
+        client.postgrest.from("store_settings")
+            .select(io.github.jan.supabase.postgrest.query.Columns.list("is_open")) {
+                filter { eq("id", 1) }
+            }
+            .decodeSingleOrNull<StoreOpenDto>()
+            ?.isOpen
+    }.getOrNull()
+
+    override suspend fun setOrderAcceptance(accepting: Boolean, reason: String?) {
+        client.postgrest.rpc(
+            function = "admin_set_order_acceptance",
+            parameters = buildJsonObject {
+                put("p_accepting", accepting)
+                put("p_reason", reason)
+            },
+        )
+    }
+
 }
+
+
+/** Minimal projection of `store_settings` for the acceptance read. */
+@kotlinx.serialization.Serializable
+private data class StoreOpenDto(
+    @kotlinx.serialization.SerialName("is_open") val isOpen: Boolean? = null,
+)

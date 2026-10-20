@@ -10,6 +10,7 @@ import com.vedant.admin.feature.catalogue.editor.ProductEditorViewModel
 import com.vedant.admin.feature.catalogue.hub.CatalogueHubViewModel
 import com.vedant.admin.feature.catalogue.offers.OffersViewModel
 import com.vedant.admin.feature.catalogue.weights.WeightsViewModel
+import com.vedant.admin.feature.dashboard.DashboardViewModel
 import com.vedant.admin.feature.delivery.DeliveryViewModel
 import com.vedant.admin.feature.orders.detail.OrderDetailViewModel
 import com.vedant.admin.feature.orders.list.OrdersListViewModel
@@ -49,6 +50,9 @@ class AppViewModelFactory(private val container: AppContainer) : ViewModelProvid
 
             modelClass.isAssignableFrom(OrderDetailViewModel::class.java) ->
                 OrderDetailViewModel(container.orderRepository)
+
+            modelClass.isAssignableFrom(DashboardViewModel::class.java) ->
+                DashboardViewModel(container.adminRpc)
 
             modelClass.isAssignableFrom(DeliveryViewModel::class.java) ->
                 DeliveryViewModel(container.adminRpc)
