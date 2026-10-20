@@ -28,6 +28,8 @@ import {
   updateAddress,
 } from "@/services/address-service";
 import { cn } from "@/lib/utils";
+import { LocationPicker } from "@/components/address/location-picker";
+import type { GeocodedAddress } from "@/lib/geocode";
 import type { AddressRow } from "@/types/database";
 
 /**
@@ -277,12 +279,11 @@ function AddressForm({
       ? { lat: address.latitude, lng: address.longitude }
       : null,
   );
-  const [locating, setLocating] = React.useState(false);
-  const [locError, setLocError] = React.useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
     setError,
   } = useForm<AddressInput>({
@@ -305,25 +306,24 @@ function AddressForm({
     },
   });
 
-  function useMyLocation() {
-    if (!navigator.geolocation) {
-      setLocError("Geolocation is not supported on this device.");
-      return;
-    }
-    setLocating(true);
-    setLocError(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocating(false);
-        toast.success("Location captured — it will be saved with your address.");
-      },
-      (err) => {
-        setLocError(err.message || "Could not get your location. Please allow location permission.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
+  /**
+   * Prefill the postal fields from a reverse-geocode result.
+   *
+   * Only what the geocoder actually *knows* is written: house, road, city,
+   * state, pincode. `landmark` is deliberately left alone — a landmark is the
+   * customer's own knowledge ("behind the temple"), not something an address
+   * service can infer, and silently inventing one would be worse than leaving
+   * it blank. Every field stays editable afterwards.
+   */
+  function applyGeocodedAddress(found: GeocodedAddress) {
+    // Street + area are joined so the courier gets the full road context;
+    // `street` caps at 80 characters, so the join is truncated, not rejected.
+    const road = [found.street, found.area].filter(Boolean).join(", ").slice(0, 80);
+    if (found.house) setValue("house_number", found.house, { shouldDirty: true });
+    if (road) setValue("street", road, { shouldDirty: true });
+    if (found.city) setValue("city", found.city, { shouldDirty: true });
+    if (found.state) setValue("state", found.state, { shouldDirty: true });
+    if (found.pincode) setValue("postal_code", found.pincode, { shouldDirty: true });
   }
 
   async function onSubmit(values: AddressInput) {
@@ -357,30 +357,16 @@ function AddressForm({
       <div className="rounded-md border border-line bg-surface-muted px-3 py-2.5">
         <p className="text-small font-medium text-ink">Delivery location</p>
         <p className="mt-0.5 text-small text-ink-muted">
-          Enable location so the delivery partner can find you on the map.
+          Share your location so we can fill the address and the delivery partner
+          can find you. You can always type it instead.
         </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={useMyLocation} loading={locating} loadingLabel="Locating…">
-            <MapPin className="size-4" aria-hidden="true" />
-            {coords ? "Update location" : "Use my location"}
-          </Button>
-          {coords ? (
-            <span className="text-small text-success">
-              ✓ {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-            </span>
-          ) : null}
+        <div className="mt-2">
+          <LocationPicker
+            initialCoords={coords ? { lat: coords.lat, lng: coords.lng } : null}
+            onAddressFound={applyGeocodedAddress}
+            onCoordsChange={(next) => setCoords(next)}
+          />
         </div>
-        {locError ? <p className="mt-1.5 text-small text-danger">{locError}</p> : null}
-        {coords ? (
-          <a
-            href={`https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1 inline-block text-small text-leaf-700 underline-offset-2 hover:underline"
-          >
-            Preview on Google Maps
-          </a>
-        ) : null}
       </div>
 
       <div className="grid gap-x-3 sm:grid-cols-2">

@@ -21,7 +21,7 @@ Everything below is measured, not asserted.
 
 | Check | Result |
 |---|---|
-| Advisor findings | **92 → 36** (security 26→20, performance 66→16) |
+| Advisor findings | **92 → 39** (security 26→22, performance 66→17) — *an earlier revision said 36; that was wrong and has been corrected against a direct advisor re-run* |
 | Tables without RLS | **0** |
 | `SECURITY DEFINER` with unpinned `search_path` | **0** |
 | `anon`-executable `DEFINER` functions | **1** — `check_username_available` (intentional, validated, boolean-only) |

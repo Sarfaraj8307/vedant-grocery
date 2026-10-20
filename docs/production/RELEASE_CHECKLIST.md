@@ -44,7 +44,7 @@ Two are yours to resolve (one credential action, one decision). One needs a Goog
 | 30 | Monitoring | **FAIL** | No crash reporting or error tracking; `audit_logs` only |
 | 31 | Accessibility audit | **FAIL** | Not run |
 | 32 | Performance/load testing | **FAIL** | Not run |
-| 33 | Remaining Advisor findings reviewed | **PASS** | 36 (from 92); each documented |
+| 33 | Remaining Advisor findings reviewed | **PASS** | **39** (from 92; security 22 / performance 17). *An earlier revision of this file said 36 — that count was wrong; QA caught it and the advisor was re-run directly to confirm 39.* Each finding documented |
 | 34 | No debug config in release | **PASS** | `AppLog` redacts JWTs/keys; no test credentials in source |
 
 **Score: 24 PASS · 9 FAIL · 2 BLOCKED**
