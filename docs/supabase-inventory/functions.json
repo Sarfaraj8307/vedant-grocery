@@ -1,0 +1,194 @@
+﻿[
+    {
+        "schema":  "private",
+        "name":  "generate_delivery_slots",
+        "args":  "p_days integer",
+        "security_definer":  true,
+        "config":  "search_path=\"\"",
+        "acl":  "(default)"
+    },
+    {
+        "schema":  "private",
+        "name":  "is_admin",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=\"\"",
+        "acl":  "(default)"
+    },
+    {
+        "schema":  "private",
+        "name":  "order_transition_allowed",
+        "args":  "p_from order_status, p_to order_status",
+        "security_definer":  false,
+        "config":  "search_path=\"\"",
+        "acl":  "(default)"
+    },
+    {
+        "schema":  "public",
+        "name":  "admin_grant_admin",
+        "args":  "p_email text, p_note text",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "admin_list_admins",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "admin_reject_order_item",
+        "args":  "p_item_id uuid, p_reason text",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "admin_restore_order_item",
+        "args":  "p_item_id uuid",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "admin_revoke_admin",
+        "args":  "p_user_id uuid",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "admin_slot_load",
+        "args":  "p_from date, p_days integer",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "admin_update_order_status",
+        "args":  "p_order_id uuid, p_status order_status, p_reason text",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "check_username_available",
+        "args":  "p_username text",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "=X/postgres | postgres=X/postgres | service_role=X/postgres | anon=X/postgres | authenticated=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "ensure_delivery_slots",
+        "args":  "p_days integer",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "gen_order_number",
+        "args":  "",
+        "security_definer":  false,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "=X/postgres | postgres=X/postgres | anon=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "handle_new_user",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=public",
+        "acl":  "=X/postgres | postgres=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "is_admin",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=\"\"",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "notify_complaint_event",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=public",
+        "acl":  "=X/postgres | postgres=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "notify_order_event",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=public",
+        "acl":  "=X/postgres | postgres=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "place_order",
+        "args":  "p_request_id text, p_address_id uuid, p_delivery_slot_id uuid",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "place_order",
+        "args":  "p_idempotency_key uuid, p_address_id uuid, p_slot_id uuid, p_delivery_date date, p_items jsonb",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "place_order_app",
+        "args":  "p_request_id text, p_address_id uuid, p_delivery_slot_id uuid",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "record_order_status_history",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "=X/postgres | postgres=X/postgres | anon=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "set_updated_at",
+        "args":  "",
+        "security_definer":  false,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "=X/postgres | postgres=X/postgres | anon=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "sync_address_pincode",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=public, pg_temp",
+        "acl":  "=X/postgres | postgres=X/postgres | anon=X/postgres | authenticated=X/postgres | service_role=X/postgres"
+    },
+    {
+        "schema":  "public",
+        "name":  "sync_profile_phone",
+        "args":  "",
+        "security_definer":  true,
+        "config":  "search_path=public",
+        "acl":  "=X/postgres | postgres=X/postgres | service_role=X/postgres"
+    }
+]

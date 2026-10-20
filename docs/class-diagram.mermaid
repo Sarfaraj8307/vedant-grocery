@@ -1,0 +1,453 @@
+%% ============================================================================
+%% docs/class-diagram.mermaid
+%% Project: hyibaljxicojfoxbihdn (Vedant Fruit & Vegetables)
+%% Author: 高见远 (Bob), Architect — 2026-10-16
+%% Core data entities (as live, plus the NEW remediation objects) and the
+%% service / authorization classes (helpers + RPCs).
+%% Legend: class annotation [NEW] = added by this remediation.
+%% Verified against information_schema.columns, pg_proc, pg_enum on 2026-10-16.
+%% ============================================================================
+
+classDiagram
+    direction LR
+
+    %% ---------------- Enums (live) ----------------
+    class order_status {
+        <<enumeration>>
+        PENDING
+        CONFIRMED
+        PROCESSING
+        READY_FOR_DELIVERY
+        OUT_FOR_DELIVERY
+        DELIVERED
+        CANCELLED
+    }
+    class complaint_status {
+        <<enumeration>>
+        OPEN
+        IN_PROGRESS
+        RESOLVED
+        CLOSED
+    }
+    class complaint_type {
+        <<enumeration>>
+        WRONG_ITEM
+        DAMAGED
+        MISSING_ITEM
+        LATE_DELIVERY
+        QUALITY
+        OTHER
+    }
+    class user_role {
+        <<enumeration>>
+        customer
+        admin
+    }
+    class outbox_audience {
+        <<enumeration>>
+        customer
+        admin
+    }
+    class staff_role {
+        <<enumeration NEW>>
+        OWNER
+        ADMIN
+        MANAGER
+        DELIVERY
+        SUPPORT
+    }
+    class account_status {
+        <<enumeration NEW>>
+        ACTIVE
+        SUSPENDED
+        BLOCKED
+        DELETED
+    }
+
+    %% ---------------- Identity / roles ----------------
+    class profiles {
+        +id uuid
+        +full_name text
+        +phone text
+        +email text
+        +username text
+        +first_name text
+        +last_name text
+        +role user_role
+        +is_active boolean
+        +account_status account_status
+        +status_reason text
+        +status_updated_at timestamptz
+        +status_updated_by uuid
+        +status_expires_at timestamptz
+        +created_at timestamptz
+        +updated_at timestamptz
+    }
+    class user_roles {
+        <<private NEW>>
+        +user_id uuid
+        +role staff_role
+        +granted_by uuid
+        +granted_at timestamptz
+        +note text
+        +is_active boolean
+    }
+    class admin_users {
+        <<private legacy>>
+        +user_id uuid
+        +note text
+        +created_at timestamptz
+    }
+    class account_status_history {
+        <<NEW>>
+        +id uuid
+        +user_id uuid
+        +old_status account_status
+        +new_status account_status
+        +reason text
+        +actor_id uuid
+        +actor_role staff_role
+        +expires_at timestamptz
+        +created_at timestamptz
+    }
+    class audit_logs {
+        <<NEW>>
+        +id bigint
+        +actor_id uuid
+        +actor_role staff_role
+        +action text
+        +entity_type text
+        +entity_id text
+        +before jsonb
+        +after jsonb
+        +reason text
+        +created_at timestamptz
+    }
+
+    %% ---------------- Catalogue ----------------
+    class categories {
+        +id uuid
+        +name text
+        +slug text
+        +glyph text
+        +icon text
+        +accent bigint
+        +image_url text
+        +sort_order int
+        +is_active boolean
+    }
+    class products {
+        +id uuid
+        +category_id uuid
+        +name text
+        +slug text
+        +price numeric
+        +base_price numeric
+        +discount_price numeric
+        +unit text
+        +unit_label text
+        +stock int
+        +max_order_qty int
+        +quantity_limit int
+        +availability boolean
+        +is_active boolean
+        +is_featured boolean
+        +has_offer boolean
+        +glyph text
+        +accent bigint
+        +image_url text
+    }
+    class product_weights {
+        +id uuid
+        +product_id uuid
+        +label text
+        +grams int
+        +price numeric
+        +is_available boolean
+    }
+    class offers {
+        +id uuid
+        +product_id uuid
+        +title text
+        +price numeric
+        +discount_percent numeric
+        +starts_at timestamptz
+        +ends_at timestamptz
+        +is_active boolean
+    }
+    class delivery_slots {
+        +id uuid
+        +name text
+        +start_time time
+        +end_time time
+        +starts_at timestamptz
+        +ends_at timestamptz
+        +max_orders int
+        +capacity int
+        +sort_order int
+        +is_active boolean
+    }
+    class store_settings {
+        +id int
+        +store_name text
+        +phone text
+        +whatsapp text
+        +delivery_fee numeric
+        +free_delivery_threshold numeric
+        +min_order_amount numeric
+        +is_open boolean
+    }
+
+    %% ---------------- Customer-owned ----------------
+    class addresses {
+        +id uuid
+        +user_id uuid
+        +label text
+        +line1 text
+        +line2 text
+        +city text
+        +pincode char
+        +full_name text
+        +phone text
+        +house_number text
+        +street text
+        +landmark text
+        +state text
+        +postal_code text
+        +latitude float
+        +longitude float
+        +is_default boolean
+    }
+    class cart_items {
+        +id uuid
+        +user_id uuid
+        +product_id uuid
+        +weight_id uuid
+        +quantity int
+    }
+    class orders {
+        +id uuid
+        +order_number text
+        +user_id uuid
+        +status order_status
+        +delivery_date date
+        +slot_id uuid
+        +delivery_slot_id uuid
+        +address_id uuid
+        +address_snapshot jsonb
+        +subtotal numeric
+        +delivery_fee numeric
+        +delivery_charge numeric
+        +total numeric
+        +original_total numeric
+        +adjustment_amount numeric
+        +adjustment_reason text
+        +final_total numeric
+        +adjusted_by text
+        +adjusted_at timestamptz
+        +idempotency_key uuid
+        +request_id text
+        +placed_at timestamptz
+        +cancelled_at timestamptz
+        +cancel_reason text
+    }
+    class order_items {
+        +id uuid
+        +order_id uuid
+        +product_id uuid
+        +product_name text
+        +unit text
+        +weight_label text
+        +unit_price numeric
+        +qty int
+        +line_total numeric
+        +rejected boolean
+        +rejection_reason text
+    }
+    class order_status_history {
+        +id uuid
+        +order_id uuid
+        +old_status text
+        +new_status text
+        +changed_by text
+        +reason text
+        +created_at timestamptz
+    }
+
+    %% ---------------- Support / notifications ----------------
+    class complaints {
+        +id uuid
+        +user_id uuid
+        +order_id uuid
+        +type complaint_type
+        +description text
+        +subject text
+        +status complaint_status
+        +admin_reply text
+        +resolution text
+        +resolved_by text
+        +resolved_at timestamptz
+    }
+    class complaint_messages {
+        +id uuid
+        +complaint_id uuid
+        +author_id uuid
+        +author_role text
+        +body text
+        +created_at timestamptz
+    }
+    class complaint_attachments {
+        +id uuid
+        +complaint_id uuid
+        +storage_path text
+        +content_type text
+        +size int
+    }
+    class notification_outbox {
+        +id bigint
+        +audience outbox_audience
+        +user_id uuid
+        +type text
+        +title text
+        +body text
+        +data jsonb
+        +read_at timestamptz
+        +created_at timestamptz
+    }
+    class notifications {
+        <<legacy duplicate>>
+        +id uuid
+        +user_id uuid
+        +title text
+        +body text
+        +read_at timestamptz
+    }
+    class events {
+        <<dormant>>
+        +id bigint
+        +session_hash text
+        +event text
+        +path text
+        +meta jsonb
+        +created_at timestamptz
+    }
+
+    %% ---------------- Authorization helpers ----------------
+    class AuthzHelpers {
+        <<private SECURITY DEFINER search_path=''>>
+        +role_of(p_user uuid) staff_role
+        +has_role(p_roles staff_role_arr) boolean
+        +is_owner() boolean
+        +is_staff() boolean
+        +is_admin() boolean
+        +can_manage_roster() boolean
+        +can_manage_users() boolean
+        +can_manage_catalogue() boolean
+        +can_manage_orders() boolean
+        +can_view_orders() boolean
+        +can_manage_complaints() boolean
+        +can_manage_store() boolean
+        +order_transition_allowed(from_status, to_status) boolean
+        +generate_delivery_slots(p_days int) int
+    }
+    class PublicAuthz {
+        <<public SECURITY DEFINER>>
+        +is_admin() boolean
+    }
+
+    %% ---------------- RPC services ----------------
+    class CustomerRpc {
+        <<public SECURITY DEFINER>>
+        +check_username_available(p_username text) boolean
+        +place_order(p_request_id text, p_address_id uuid, p_delivery_slot_id uuid) uuid
+        +place_order_app(p_request_id text, p_address_id uuid, p_delivery_slot_id uuid) uuid
+        +place_order_engine(p_idempotency_key uuid, p_address_id uuid, p_slot_id uuid, p_delivery_date date, p_items jsonb) jsonb
+        +record_event(p_session_hash text, p_event text, p_path text, p_meta jsonb) void
+    }
+    class AdminOrderRpc {
+        <<public SECURITY DEFINER gate can_manage_orders>>
+        +admin_update_order_status(p_order_id uuid, p_status order_status, p_reason text) orders
+        +admin_reject_order_item(p_item_id uuid, p_reason text) orders
+        +admin_restore_order_item(p_item_id uuid) orders
+        +admin_adjust_order(p_order_id uuid, p_adjustment_amount numeric, p_reason text) orders
+        +admin_slot_load(p_from date, p_days int) table
+    }
+    class AdminRosterRpc {
+        <<public SECURITY DEFINER gate can_manage_roster>>
+        +owner_grant_role(p_email text, p_role staff_role, p_note text) uuid
+        +owner_revoke_role(p_user_id uuid) void
+        +admin_list_admins() table
+        +admin_set_account_status(p_user_id uuid, p_status account_status, p_reason text, p_expires_at timestamptz) profiles
+    }
+    class AdminReportingRpc {
+        <<public SECURITY DEFINER STABLE>>
+        +admin_dashboard_counts() table
+        +admin_sales_today(p_date date) table
+        +admin_search_users(p_query text, p_filter text, p_limit int, p_offset int) table
+    }
+    class CatalogueRpc {
+        <<public SECURITY DEFINER>>
+        +ensure_delivery_slots(p_days int) int
+    }
+
+    %% ---------------- Trigger services ----------------
+    class TriggerServices {
+        <<trigger functions - EXECUTE revoked from anon/authenticated>>
+        +handle_new_user() trigger
+        +notify_order_event() trigger
+        +notify_complaint_event() trigger
+        +record_order_status_history() trigger
+        +sync_address_pincode() trigger
+        +sync_profile_phone() trigger
+        +set_updated_at() trigger
+        +gen_order_number() text
+    }
+
+    %% ---------------- Relationships ----------------
+    profiles "1" --> "*" addresses : owns
+    profiles "1" --> "*" orders : places
+    profiles "1" --> "*" cart_items : has
+    profiles "1" --> "*" complaints : raises
+    profiles "1" --> "*" notification_outbox : receives
+    profiles "1" --> "0..1" user_roles : staff role
+    user_roles ..> staff_role : uses
+    admin_users ..> user_roles : migrated into
+    profiles ..> account_status : status
+    profiles "1" --> "*" account_status_history : history
+    account_status_history ..> account_status : from/to
+    audit_logs ..> staff_role : actor_role
+
+    categories "1" --> "*" products : contains
+    products "1" --> "*" product_weights : variants
+    products "1" --> "*" offers : promotions
+    products "1" --> "*" cart_items : in-cart
+    product_weights "1" --> "*" cart_items : chosen-pack
+
+    orders "1" --> "*" order_items : lines
+    orders "1" --> "*" order_status_history : timeline
+    orders "0..1" --> "1" delivery_slots : slot
+    orders "0..1" --> "1" addresses : address
+    orders "1" --> "*" complaints : about
+    orders ..> order_status : status
+    order_items ..> products : references
+
+    complaints "1" --> "*" complaint_messages : thread
+    complaints "1" --> "*" complaint_attachments : media
+    complaints ..> complaint_status : status
+    complaints ..> complaint_type : type
+
+    AuthzHelpers <.. PublicAuthz : delegates
+    AdminOrderRpc ..> AuthzHelpers : gate
+    AdminRosterRpc ..> AuthzHelpers : gate
+    AdminReportingRpc ..> AuthzHelpers : gate
+    CatalogueRpc ..> AuthzHelpers : gate
+    CustomerRpc ..> AuthzHelpers : account-status check
+    AdminOrderRpc ..> orders : writes
+    AdminOrderRpc ..> order_items : writes
+    AdminRosterRpc ..> user_roles : writes
+    AdminRosterRpc ..> account_status_history : writes
+    AdminRosterRpc ..> audit_logs : writes
+    TriggerServices ..> notification_outbox : writes
+    TriggerServices ..> order_status_history : writes
+    notification_outbox ..> outbox_audience : audience
+    profiles ..> user_role : legacy role

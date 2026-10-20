@@ -1,0 +1,90 @@
+%% Vedant Admin (Android) — key call flows (sequence diagrams)
+%% Extracted from docs/ARCHITECTURE.md. These are the flows that must never fake success.
+
+sequenceDiagram
+    autonumber
+    participant UI as SplashScreen
+    participant VM as SplashViewModel
+    participant Auth as AuthRepositoryImpl
+    participant SB as Supabase Auth
+    participant RPC as RPC is_admin()
+
+    UI->>VM: onCreate / restore()
+    VM->>VM: state = Unknown (spinner)
+    VM->>Auth: restoreSession()
+    Auth->>SB: autoLoadFromStorage (persisted refresh token)
+    alt no session
+        SB-->>Auth: no session
+        Auth-->>VM: Outcome.Success(AdminIdentity(isAdmin=false, no user))
+        VM-->>UI: SessionState.SignedOut
+    else session present
+        SB-->>Auth: session(userId, email)
+        Auth->>RPC: is_admin()
+        alt 42501 / false
+            RPC-->>Auth: false
+            Auth-->>VM: Outcome.Success(AdminIdentity(isAdmin=false))
+            VM-->>UI: SessionState.NotAuthorized
+        else true
+            RPC-->>Auth: true
+            Auth-->>VM: Outcome.Success(AdminIdentity(isAdmin=true))
+            VM-->>UI: SessionState.SignedIn
+        end
+    end
+    Note over UI: NavHost guard routes on SessionState.<br/>Never a locally cached role.
+
+sequenceDiagram
+    autonumber
+    participant UI as OrderDetailScreen
+    participant VM as OrderDetailViewModel
+    participant Repo as OrderRepositoryImpl
+    participant RPC as RPC admin_update_order_status
+    participant PG as Postgres (state machine)
+
+    UI->>VM: onAccept()  // user taps "Confirm"
+    VM->>VM: action = InFlight  (button spinner, double-submit blocked)
+    VM->>Repo: updateStatus(orderId, CONFIRMED, reason=null)
+    Repo->>RPC: admin_update_order_status(orderId, 'CONFIRMED', null)
+    RPC->>PG: private.order_transition_allowed(from,to)?
+    alt transition illegal
+        PG-->>RPC: raise 22023 "cannot move ..."
+        RPC-->>Repo: RestException(22023)
+        Repo-->>VM: Outcome.Failure(AppError.Validation)
+        VM->>VM: action = Failed ; order UNCHANGED
+        VM-->>UI: show mapped copy ; status does NOT move
+    else not admin
+        PG-->>RPC: raise 42501
+        Repo-->>VM: Outcome.Failure(AppError.Unauthorized)
+        VM-->>UI: "You don't have permission..." ; no change
+    else allowed
+        PG-->>RPC: ok (history + notify written)
+        RPC-->>Repo: ok
+        Repo->>Repo: getOrder(orderId)  // RE-FETCH server row
+        Repo-->>VM: Outcome.Success(Order)  // server-confirmed status + totals
+        VM->>VM: action = Idle ; order = server row
+        VM-->>UI: render exactly the server result
+    end
+
+sequenceDiagram
+    autonumber
+    participant UI as RejectItemSheet
+    participant VM as OrderDetailViewModel
+    participant Repo as OrderRepositoryImpl
+    participant RPC as RPC admin_reject_order_item
+    participant PG as Postgres (money rules)
+
+    UI->>VM: onRejectItem(itemId, reason)
+    VM->>VM: action = InFlight  (submit disabled)
+    VM->>Repo: rejectItem(itemId, reason)
+    Repo->>RPC: admin_reject_order_item(itemId, reason)
+    Note over RPC,PG: NO amount is ever sent by the client.
+    RPC->>PG: recompute adjustment_amount (<=0) and final_total
+    alt item already rejected / order terminal
+        PG-->>RPC: raise 22023
+        Repo-->>VM: Outcome.Failure(AppError.Validation)
+        VM-->>UI: show copy ; totals UNCHANGED
+    else ok
+        PG-->>RPC: ok  original_total / adjustment_amount / final_total
+        Repo->>Repo: getOrder(orderId)
+        Repo-->>VM: Outcome.Success(Order)  // server-computed final_total
+        VM-->>UI: render final_total verbatim (never locally computed)
+    end

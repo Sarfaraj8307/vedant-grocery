@@ -1,0 +1,574 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   VEDANT DESIGN SYSTEM — design tokens
+   See docs/DESIGN_SYSTEM.md. No hex value may appear in a component.
+   Tailwind v4 `@theme` turns each token below into utilities
+   (e.g. --color-leaf-600 → bg-leaf-600 / text-leaf-600 / border-leaf-600).
+   ========================================================================== */
+
+@theme {
+  /* --- Produce green: brand primary (natural, earthy) ------------------- */
+  --color-leaf-50: #f2f8f3;
+  --color-leaf-100: #dfeee2;
+  --color-leaf-200: #bfdcc6;
+  --color-leaf-300: #93c2a1;
+  --color-leaf-400: #5fa277;
+  --color-leaf-500: #3d855a;
+  --color-leaf-600: #2a6b46;
+  --color-leaf-700: #1f5537;
+  --color-leaf-800: #1a432d;
+  --color-leaf-900: #142f21;
+
+  /* --- Harvest: warm amber accent --------------------------------------- */
+  --color-harvest-50: #fff8ec;
+  --color-harvest-100: #fdebdb;
+  --color-harvest-200: #fad79a;
+  --color-harvest-300: #f5be5f;
+  --color-harvest-400: #efa632;
+  --color-harvest-500: #de8e18;
+  --color-harvest-600: #b96f10;
+  --color-harvest-700: #8f520d;
+  /* legacy aliases — keep until all components migrated */
+  --color-marigold-50: #fff8ec;
+  --color-marigold-100: #fdebdb;
+  --color-marigold-200: #fad79a;
+  --color-marigold-300: #f5be5f;
+  --color-marigold-400: #efa632;
+  --color-marigold-500: #de8e18;
+  --color-marigold-600: #b96f10;
+  --color-marigold-700: #8f520d;
+
+  /* --- Berry: offers / savings (never errors) --------------------------- */
+  --color-berry-100: #fbe8f0;
+  --color-berry-500: #a93a63;
+  --color-berry-600: #8b2e5c;
+  --color-berry-700: #6e2449;
+  --color-beet-100: #fbe8f0;
+  --color-beet-200: #f6cede;
+  --color-beet-500: #a93a63;
+  --color-beet-600: #8b2e5c;
+  --color-beet-700: #6e2449;
+
+  /* --- Natural: warm neutrals + earth tones ----------------------------- */
+  --color-paper: #fdfcf7;
+  --color-paper-warm: #fdfcf7;
+  --color-earth-50: #faf6ed;
+  --color-earth-100: #f5ecd8;
+  --color-earth-200: #e8dcc0;
+  --color-earth-300: #d4c4a8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #faf6ed;
+  --color-surface-sunken: #efe9d9;
+  --color-surface-elevated: #ffffff;
+  --color-line: #e8ddd0;
+  --color-line-strong: #d4c4a8;
+  --color-ink: #1a2e1a;
+  --color-ink-muted: #5c6b52;
+  --color-ink-subtle: #8a9a7b;
+
+  /* --- Semantic --------------------------------------------------------- */
+  --color-success: #1e8e5a;
+  --color-success-bg: #e6f5ec;
+  --color-warning: #b26a05;
+  --color-warning-bg: #fdf3e2;
+  --color-danger: #b3261e;
+  --color-danger-bg: #fdecea;
+  --color-info: #1f6fb2;
+  --color-info-bg: #eaf2fa;
+
+  /* --- Typography ------------------------------------------------------- */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-inter), ui-sans-serif,
+    system-ui, sans-serif;
+
+  --text-display-xl: clamp(2.75rem, 6.5vw, 4.5rem);
+  --text-display-xl--line-height: 0.95;
+  --text-display-xl--letter-spacing: -0.035em;
+  --text-display-xl--font-weight: 600;
+
+  --text-display: clamp(2.125rem, 4.5vw, 3.25rem);
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 600;
+
+  --text-h1: clamp(1.75rem, 3vw, 2.25rem);
+  --text-h1--line-height: 1.15;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 600;
+
+  --text-h2: clamp(1.375rem, 2.2vw, 1.75rem);
+  --text-h2--line-height: 1.2;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 600;
+
+  --text-h3: 1.0625rem;
+  --text-h3--line-height: 1.35;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+
+  --text-body-lg: 1.0625rem;
+  --text-body-lg--line-height: 1.6;
+
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.6;
+
+  --text-small: 0.8125rem;
+  --text-small--line-height: 1.5;
+
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1.4;
+  --text-caption--letter-spacing: 0.09em;
+  --text-caption--font-weight: 600;
+
+  --text-price-lg: 1.5rem;
+  --text-price-lg--line-height: 1.1;
+  --text-price-lg--letter-spacing: -0.02em;
+  --text-price-lg--font-weight: 650;
+
+  --text-price: 1.0625rem;
+  --text-price--line-height: 1.2;
+  --text-price--letter-spacing: -0.01em;
+  --text-price--font-weight: 600;
+
+  /* --- Radius ----------------------------------------------------------- */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+
+  /* --- Elevation (green-tinted, never grey) ----------------------------- */
+  --shadow-xs: 0 1px 2px rgba(20, 33, 26, 0.05);
+  --shadow-sm: 0 2px 6px -1px rgba(20, 33, 26, 0.07),
+    0 1px 2px rgba(20, 33, 26, 0.04);
+  --shadow-md: 0 8px 20px -6px rgba(20, 33, 26, 0.12);
+  --shadow-lg: 0 20px 44px -18px rgba(20, 33, 26, 0.2);
+  --shadow-produce: 0 12px 26px -14px rgba(42, 107, 70, 0.38);
+  --shadow-sticky: 0 -6px 18px -8px rgba(20, 33, 26, 0.14);
+
+  /* --- Motion ----------------------------------------------------------- */
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  --animate-shimmer: shimmer 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-ticker: ticker 38s linear infinite;
+  --animate-rise: rise 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-reveal: reveal 0.7s var(--ease-entrance) both;
+  --animate-drift: drift 7s ease-in-out infinite;
+  --animate-sheen: sheen 2.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) rotate(3deg);
+  }
+}
+
+@keyframes sheen {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* Motion duration tokens (used by components + Motion JS) */
+    --motion-instant: 100ms;
+    --motion-fast: 150ms;
+    --motion-base: 220ms;
+    --motion-slow: 320ms;
+    --motion-entrance: 480ms;
+    /* Layout */
+    --shell-max: 1220px;
+    /* Mobile header = the 56px toolbar + 1px divider + the 36px
+       delivery-location row (see SiteHeader) = 93px. Desktop keeps the single
+       72px toolbar. Measured: 94px / 73px including the header's bottom border,
+       which the token, like the desktop value, excludes. */
+    --header-h: 93px;
+    color-scheme: light;
+  }
+
+  @media (min-width: 1024px) {
+    :root {
+      --header-h: 72px;
+    }
+  }
+
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Stops iOS rubber-banding a fixed bottom bar off-screen */
+    overscroll-behavior-y: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Numbers in a grocery UI are content: line them up. */
+  [data-numeric],
+  time {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Focus: always a 2px leaf ring with a paper offset so it is visible on
+     white cards AND on leaf-filled buttons. */
+  :focus-visible {
+    outline: 2px solid var(--color-leaf-600);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background-color: var(--color-leaf-200);
+    color: var(--color-leaf-900);
+  }
+
+  /* Warm, unobtrusive scrollbars (desktop only; mobile uses overlay bars) */
+  @media (pointer: fine) {
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--color-paper);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--color-line-strong);
+      border-radius: 999px;
+      border: 3px solid var(--color-paper);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--color-leaf-300);
+    }
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Kill the iOS input zoom-on-focus without disabling user zoom. */
+  @media (max-width: 640px) {
+    input,
+    textarea,
+    select {
+      font-size: max(16px, 1rem);
+    }
+  }
+}
+
+/* ==========================================================================
+   UTILITIES
+   ========================================================================== */
+
+@utility shell {
+  width: 100%;
+  max-width: var(--shell-max);
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+@media (min-width: 640px) {
+  .shell {
+    padding-inline: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .shell {
+    padding-inline: 32px;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+@utility rail-snap {
+  /* Horizontally snappable rail (categories, rate board ticker). */
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+@utility pb-safe {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+@utility pb-nav {
+  /* Clears the fixed bottom navigation + cart bar on mobile. */
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .pb-nav {
+    padding-bottom: 4rem;
+  }
+}
+
+@utility text-balance-tight {
+  text-wrap: balance;
+  letter-spacing: -0.02em;
+}
+
+@utility mandi-rule {
+  /* Signature motif: the dashed hairline of a market rate board. */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-line-strong) 0 6px,
+    transparent 6px 12px
+  );
+  background-repeat: repeat-x;
+  background-size: 12px 1px;
+  background-position: 0 100%;
+}
+
+@utility tint-surface {
+  /* Product/category accent tint derived from the database `accent` RGB.
+     Set --tint on the element; safe because it is only ever a background. */
+  background-image: radial-gradient(
+      120% 90% at 30% 15%,
+      color-mix(in oklab, var(--tint, var(--color-surface-muted)) 92%, white),
+      transparent 70%
+    ),
+    linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--tint, var(--color-surface-muted)) 70%, white),
+      var(--color-surface-muted)
+    );
+}
+
+/* ==========================================================================
+   OVERLAY / SHEET ANIMATION
+   Driven by Radix `data-state` attributes. Pure CSS so opening a sheet does
+   not pull a motion library into the critical path.
+   ========================================================================== */
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+}
+@keyframes sheet-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-out-bottom {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes sheet-out-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@layer components {
+  .ui-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background-color: color-mix(in oklab, var(--color-leaf-900) 42%, transparent);
+    backdrop-filter: blur(2px);
+  }
+  .ui-overlay[data-state="open"] {
+    animation: overlay-in var(--motion-base) var(--ease-standard);
+  }
+  .ui-overlay[data-state="closed"] {
+    animation: overlay-out var(--motion-fast) var(--ease-exit) forwards;
+  }
+
+  .ui-dialog-content {
+    position: fixed;
+    z-index: 51;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+    outline: none;
+  }
+  .ui-dialog-content[data-state="open"] {
+    animation: dialog-in var(--motion-base) var(--ease-entrance);
+  }
+  .ui-dialog-content[data-state="closed"] {
+    animation: dialog-out var(--motion-fast) var(--ease-exit) forwards;
+  }
+
+  /* Bottom sheet — the mobile presentation (thumb-reachable). */
+  .ui-sheet-bottom {
+    inset-inline: 0;
+    bottom: 0;
+    max-height: 92vh;
+    border-start-start-radius: var(--radius-xl);
+    border-start-end-radius: var(--radius-xl);
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .ui-sheet-bottom[data-state="open"] {
+    animation: sheet-in-bottom var(--motion-slow) var(--ease-entrance);
+  }
+  .ui-sheet-bottom[data-state="closed"] {
+    animation: sheet-out-bottom var(--motion-base) var(--ease-exit) forwards;
+  }
+
+  /* Side sheet — the desktop presentation. */
+  .ui-sheet-right {
+    inset-block: 0;
+    right: 0;
+    width: min(28rem, 100vw);
+    border-start-start-radius: var(--radius-xl);
+    border-end-start-radius: var(--radius-xl);
+  }
+  .ui-sheet-right[data-state="open"] {
+    animation: sheet-in-right var(--motion-slow) var(--ease-entrance);
+  }
+  .ui-sheet-right[data-state="closed"] {
+    animation: sheet-out-right var(--motion-base) var(--ease-exit) forwards;
+  }
+
+  .ui-menu-content[data-state="open"] {
+    animation: menu-in var(--motion-fast) var(--ease-standard);
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION — global kill switch (see DESIGN_SYSTEM §8)
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* The only permitted motion: a short opacity change. */
+  .rm-fade {
+    transition: opacity 120ms linear !important;
+  }
+}

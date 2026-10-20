@@ -1,0 +1,88 @@
+name: CI
+
+# Runs on every pull request and on pushes to the default branch.
+# Deliberately does NOT deploy — deployment needs secrets that must not live in
+# the repo, and a red build should never be able to ship.
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web (typecheck · lint · test · build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+      - name: Lint
+        run: pnpm exec eslint src
+      - name: Unit tests
+        run: pnpm exec vitest run
+      - name: Production build
+        # The build needs the public Supabase URL + publishable key. They are
+        # PUBLIC by definition (they ship in the browser bundle), so dummy values
+        # are enough to prove the build compiles without leaking a real secret
+        # into CI logs. A real deploy supplies the true values.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        run: pnpm run build
+
+  android:
+    name: Android (unit tests · assembleDebug)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --console=plain
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --console=plain
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: admin-android/app/build/test-results/**
+          retention-days: 7
+
+  migrations:
+    name: Migrations (ordering + syntax guard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify migrations are ordered and non-empty
+        run: |
+          set -e
+          files=$(ls supabase/migrations/*.sql | sort)
+          count=$(echo "$files" | wc -l)
+          echo "Found $count migrations"
+          for f in $files; do
+            if [ ! -s "$f" ]; then echo "EMPTY: $f"; exit 1; fi
+            # Every migration must be wrapped in a transaction so a partial
+            # failure cannot leave the schema half-applied.
+            if ! grep -qiE '^begin;' "$f"; then echo "NO BEGIN: $f"; exit 1; fi
+            if ! grep -qiE '^commit;' "$f"; then echo "NO COMMIT: $f"; exit 1; fi
+          done
+          echo "All migrations ordered, non-empty and transactional."

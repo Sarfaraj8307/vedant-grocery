@@ -1,0 +1,253 @@
+%% Vedant Admin (Android) — class diagram (domain + key services)
+%% Extracted from docs/ARCHITECTURE.md §5.4. Wire/legacy column names live only in data/ DTOs.
+
+classDiagram
+    class OrderStatus {
+        <<enum>>
+        PENDING
+        CONFIRMED
+        PROCESSING
+        READY_FOR_DELIVERY
+        OUT_FOR_DELIVERY
+        DELIVERED
+        CANCELLED
+        +label : String
+        +isTerminal : Boolean
+        +nextStatuses : List~OrderStatus~
+        +fromWire(String) OrderStatus?
+    }
+    class Money {
+        <<value class>>
+        +paise : Long
+        +parse(String) Money
+        +format() String
+    }
+    class Order {
+        +id : String
+        +status : OrderStatus
+        +originalTotal : Money
+        +adjustmentAmount : Money
+        +finalTotal : Money
+        +deliveryCharge : Money
+        +deliverySlotId : String?
+        +createdAt : Instant
+        +items : List~OrderItem~
+    }
+    class OrderItem {
+        +id : String
+        +productName : String
+        +weightLabel : String?
+        +qty : Int
+        +unitPrice : Money
+        +lineTotal : Money
+        +rejected : Boolean
+        +rejectionReason : String?
+    }
+    class Product {
+        +id : String
+        +name : String
+        +slug : String?
+        +basePrice : Money
+        +discountPrice : Money?
+        +hasOffer : Boolean
+        +isActive : Boolean
+        +isFeatured : Boolean
+        +stock : Int?
+        +quantityLimit : Int?
+        +unit : String?
+        +unitLabel : String?
+        +categoryId : String?
+    }
+    class Category {
+        +id : String
+        +name : String
+        +slug : String?
+        +icon : String?
+        +glyph : String?
+        +accent : String?
+        +sortOrder : Int
+        +isActive : Boolean
+    }
+    class ProductWeight {
+        +id : String
+        +productId : String
+        +grams : Int
+        +label : String
+        +price : Money
+        +isAvailable : Boolean
+    }
+    class Offer {
+        +id : String
+        +productId : String
+        +title : String
+        +discountPercent : Int?
+        +price : Money?
+        +startsAt : Instant
+        +endsAt : Instant
+        +isActive : Boolean
+    }
+    class DeliverySlot {
+        +id : String
+        +name : String?
+        +startsAt : Instant
+        +endsAt : Instant
+        +capacity : Int
+        +sortOrder : Int
+        +isActive : Boolean
+    }
+    class SlotLoad {
+        +slotId : String
+        +booked : Int
+        +capacity : Int
+    }
+    class Complaint {
+        +id : String
+        +orderId : String?
+        +subject : String
+        +description : String
+        +status : String
+        +createdAt : Instant
+    }
+    class ComplaintMessage {
+        +id : String
+        +complaintId : String
+        +authorRole : String
+        +body : String
+        +createdAt : Instant
+    }
+    class StoreSettings {
+        +storeName : String
+        +phone : String?
+        +whatsapp : String?
+        +isOpen : Boolean
+        +deliveryFee : Money
+        +freeDeliveryThreshold : Money
+        +minOrderAmount : Money
+    }
+    class Profile {
+        +id : String
+        +email : String?
+        +firstName : String?
+        +lastName : String?
+        +phone : String?
+    }
+    class AdminIdentity {
+        +userId : String
+        +email : String?
+        +isAdmin : Boolean
+    }
+    class Outcome~T~ {
+        <<sealed>>
+    }
+    class AppError {
+        <<sealed>>
+    }
+    class SessionState {
+        <<sealed>>
+        Unknown
+        SignedOut
+        SignedIn
+        NotAuthorized
+    }
+    class AuthRepository {
+        <<interface>>
+        +sessionState : StateFlow~SessionState~
+        +signIn(email, password) Outcome~Unit~
+        +signOut() Outcome~Unit~
+        +restoreSession() Outcome~AdminIdentity~
+        +isAdmin() Outcome~Boolean~
+        +currentUserId() String?
+        +currentAccessToken() String?
+    }
+    class OrderRepository {
+        <<interface>>
+        +listOrders(filter, page) Outcome~List~OrderSummary~~
+        +getOrder(id) Outcome~Order~
+        +updateStatus(id, status, reason) Outcome~Order~
+        +rejectItem(itemId, reason) Outcome~Order~
+        +restoreItem(itemId) Outcome~Order~
+        +statusHistory(orderId) Outcome~List~OrderStatusEvent~~
+        +dashboardCounts() Outcome~DashboardCounts~
+    }
+    class ProductRepository {
+        <<interface>>
+        +listProducts(query) Outcome~List~Product~~
+        +getProduct(id) Outcome~Product~
+        +createProduct(draft) Outcome~Product~
+        +updateProduct(id, draft) Outcome~Product~
+        +setAvailability(id, active, availability, stock) Outcome~Product~
+        +uploadImage(localUri, productId) Outcome~String~
+    }
+    class CategoryRepository {
+        <<interface>>
+        +listCategories() Outcome~List~Category~~
+        +createCategory(draft) Outcome~Category~
+        +updateCategory(id, draft) Outcome~Category~
+        +setActive(id, active) Outcome~Category~
+    }
+    class WeightRepository {
+        <<interface>>
+        +listWeights(productId) Outcome~List~ProductWeight~~
+        +upsertWeight(productId, draft) Outcome~ProductWeight~
+        +deleteWeight(weightId) Outcome~Unit~
+    }
+    class OfferRepository {
+        <<interface>>
+        +listOffers(productId) Outcome~List~Offer~~
+        +upsertOffer(draft) Outcome~Offer~
+        +setActive(offerId, active) Outcome~Offer~
+        +deleteOffer(offerId) Outcome~Unit~
+    }
+    class SlotRepository {
+        <<interface>>
+        +listSlots(from, days) Outcome~List~DeliverySlot~~
+        +slotLoad(from, days) Outcome~List~SlotLoad~~
+        +ensureSlots(days) Outcome~Int~
+        +upsertSlot(draft) Outcome~DeliverySlot~
+        +setActive(slotId, active) Outcome~DeliverySlot~
+    }
+    class ComplaintRepository {
+        <<interface>>
+        +listComplaints(filter) Outcome~List~Complaint~~
+        +getComplaint(id) Outcome~Complaint~
+        +listMessages(id) Outcome~List~ComplaintMessage~~
+        +changeStatus(id, status) Outcome~Complaint~
+        +reply(id, body) Outcome~ComplaintMessage~
+        +listAttachments(id) Outcome~List~ComplaintAttachment~~
+    }
+    class StoreSettingsRepository {
+        <<interface>>
+        +getSettings() Outcome~StoreSettings~
+        +updateSettings(draft) Outcome~StoreSettings~
+    }
+    class ProfileRepository {
+        <<interface>>
+        +me() Outcome~Profile~
+        +updateProfile(draft) Outcome~Profile~
+        +listAdmins() Outcome~List~AdminIdentity~~
+    }
+
+    Order "1" --> "*" OrderItem : contains
+    Order --> OrderStatus : status
+    Order --> Money : totals
+    OrderItem --> Money : prices
+    Product --> Category : categoryId
+    Product --> Money : basePrice
+    Product "1" --> "*" ProductWeight : variants
+    Product "1" --> "*" Offer : offers
+    Complaint --> Order : orderId
+    Complaint "1" --> "*" ComplaintMessage : thread
+    AuthRepository ..> Outcome
+    AuthRepository ..> SessionState
+    OrderRepository ..> Outcome
+    OrderRepository ..> Order
+    OrderRepository ..> AppError
+    ProductRepository ..> Product
+    CategoryRepository ..> Category
+    WeightRepository ..> ProductWeight
+    OfferRepository ..> Offer
+    SlotRepository ..> DeliverySlot
+    SlotRepository ..> SlotLoad
+    ComplaintRepository ..> Complaint
+    StoreSettingsRepository ..> StoreSettings
+    ProfileRepository ..> Profile

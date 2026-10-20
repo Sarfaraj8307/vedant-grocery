@@ -1,0 +1,11 @@
+detected_doc_type: "客户交付/实施与路线图交接报告 (client-facing implementation & roadmap handoff report)"
+target_length: 6500
+target_tone: "专业、平实、诚实（formal, plain, evidence-based）；第三人称机构语气，明确区分已验证与未验证"
+audience: "店主（客户）/ 后续开发团队 (store owner + future dev team)"
+core_messages:
+  - "管理端 Android App 已按 29 项能力全部实现，构建/单测全绿"
+  - "诚实三态：8 VERIFIED / 17 IMPLEMENTED-BUT-UNVERIFIED / 1 BLOCKED；未执行过的绝不标 VERIFIED"
+  - "活库是唯一权威：三份历史 schema 文档均过时，记录 22 处 doc-vs-live 冲突"
+  - "两个外部阻塞 R1(无管理员凭据) / R2(无设备或模拟器) 决定所有待验证项"
+  - "客户 Web App(PWA) 已实现能力 vs 推荐未来增强 的清晰分离"
+evidence_basis: "全部数据可溯源至项目 docs/ 下源文件，无外部检索、无虚构数字"

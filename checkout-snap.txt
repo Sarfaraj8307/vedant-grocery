@@ -1,0 +1,73 @@
+- generic [ref=f4e1]:
+  - link "Skip to content" [ref=f4e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=f4e3]:
+    - generic [ref=f4e4]:
+      - link "Vedant Fruit & Vegetables — home" [ref=f4e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f4e11]:
+          - generic [ref=f4e12]: Vedant
+          - generic [ref=f4e13]: Fruit & Vegetables
+      - search [ref=f4e15]:
+        - searchbox "Search products" [ref=f4e16]
+      - link "Basket, empty" [ref=f4e17] [cursor=pointer]:
+        - /url: /cart
+      - button "Browse categories and help" [ref=f4e21]
+  - main [ref=f4e24]:
+    - generic [ref=f4e27]:
+      - link "Vedant Fruit & Vegetables" [ref=f4e29] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f4e35]:
+          - generic [ref=f4e36]: Vedant
+          - generic [ref=f4e37]: Fruit & Vegetables
+      - heading "Welcome back" [level=1] [ref=f4e38]
+      - paragraph [ref=f4e39]: Sign in to reorder favourites and track deliveries.
+      - generic [ref=f4e42]:
+        - generic [ref=f4e43]:
+          - generic [ref=f4e44]:
+            - text: Email*
+            - generic [ref=f4e45]: (required)
+          - textbox "Email (required)" [active] [ref=f4e46]
+          - paragraph [ref=f4e47]
+        - generic [ref=f4e48]:
+          - generic [ref=f4e49]:
+            - text: Password*
+            - generic [ref=f4e50]: (required)
+          - textbox "Password (required)" [ref=f4e51]
+          - paragraph [ref=f4e52]
+        - link "Forgot your password?" [ref=f4e54] [cursor=pointer]:
+          - /url: /forgot-password
+        - button "Sign in" [ref=f4e55]
+      - generic [ref=f4e57]:
+        - text: New to Vedant?
+        - link "Create an account" [ref=f4e58] [cursor=pointer]:
+          - /url: /signup
+  - navigation "Primary" [ref=f4e59]:
+    - list [ref=f4e60]:
+      - listitem [ref=f4e61]:
+        - link [ref=f4e62] [cursor=pointer]:
+          - /url: /
+      - listitem [ref=f4e67]:
+        - link [ref=f4e68] [cursor=pointer]:
+          - /url: /categories
+      - listitem [ref=f4e75]:
+        - link [ref=f4e76] [cursor=pointer]:
+          - /url: /search
+      - listitem [ref=f4e81]:
+        - link [ref=f4e82] [cursor=pointer]:
+          - /url: /orders
+      - listitem [ref=f4e86]:
+        - link [ref=f4e87] [cursor=pointer]:
+          - /url: /account
+  - status [ref=f4e92]:
+    - generic [ref=f4e93]:
+      - generic [ref=f4e98]:
+        - paragraph [ref=f4e99]: Add Vedant to your home screen
+        - paragraph [ref=f4e100]: Opens faster and keeps your basket when you are offline.
+        - generic [ref=f4e101]:
+          - button "Install" [ref=f4e102]
+          - button "Not now" [ref=f4e104]
+      - button "Dismiss" [ref=f4e106]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f4e116] [cursor=pointer]
+  - alert [ref=f4e120]

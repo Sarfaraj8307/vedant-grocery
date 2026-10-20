@@ -1,0 +1,133 @@
+%% ============================================================================
+%% docs/sequence-diagram.mermaid
+%% Project: hyibaljxicojfoxbihdn (Vedant Fruit & Vegetables)
+%% Author: 高见远 (Bob), Architect — 2026-10-16
+%% Two key flows: (1) customer place_order, (2) admin order-lifecycle + item
+%% adjustment. Verified against live function bodies (place_order,
+%% place_order_app, admin_update_order_status, admin_reject_order_item).
+%% ============================================================================
+
+%% ----------------------------------------------------------------------------
+%% FLOW 1 — Customer checkout: place_order
+%% ----------------------------------------------------------------------------
+sequenceDiagram
+    autonumber
+    actor C as Customer (web/Android)
+    participant CL as Client (order-service / OrderRepository)
+    participant API as PostgREST (RPC)
+    participant POA as public.place_order_app(text,uuid,uuid)
+    participant PO as public.place_order(uuid,date,uuid,jsonb)
+    participant DB as Postgres (orders/order_items/stock)
+    participant TRG as triggers (history + notify)
+
+    C->>CL: tap "Place order" (address, slot)
+    CL->>API: POST /rest/v1/rpc/place_order_app {p_request_id,p_address_id,p_delivery_slot_id}
+    API->>POA: invoke (SECURITY DEFINER, search_path='')
+
+    POA->>POA: v_uid := auth.uid(); if null -> 42501 "authentication required"
+    POA->>POA: request_id length 8..128 else 22023
+    Note over POA: NEW (T03): reject if profiles.account_status in (SUSPENDED,BLOCKED,DELETED)
+    POA->>POA: idempotency_key := md5(uid || ':' || request_id)::uuid
+    POA->>DB: SELECT delivery_slots.starts_at -> delivery_date (today/tomorrow, Asia/Kolkata)
+    POA->>DB: SELECT cart_items WHERE user_id = uid -> p_items (product_id,weight_id,qty)
+    alt cart empty
+        POA-->>API: RAISE 22023 "cart is empty"
+    end
+    POA->>PO: place_order(p_idempotency_key, p_address_id, p_slot_id, p_delivery_date, p_items)  %% named args
+
+    PO->>DB: SELECT orders WHERE idempotency_key = key
+    alt replay found
+        PO-->>POA: {order_id, order_number, replay:true}
+    else new
+        PO->>DB: SELECT store_settings (is_open) -> else STORE_CLOSED
+        PO->>DB: validate delivery_date in (today, tomorrow) -> else INVALID_DATE
+        PO->>DB: SELECT addresses WHERE id AND user_id = uid -> else INVALID_ADDRESS
+        PO->>DB: SELECT delivery_slots FOR UPDATE; count orders < max_orders -> else SLOT_FULL
+        loop each item (FOR UPDATE products)
+            PO->>DB: check is_active / max_order_qty / stock -> PRODUCT_UNAVAILABLE|QTY_EXCEEDED|OUT_OF_STOCK
+            PO->>DB: resolve product_weights (price) -> else WEIGHT_UNAVAILABLE
+            PO->>DB: pick live offer (is_active, window, created_at desc limit 1)
+            PO->>PO: price := least(list, offer.price, list*(1-disc/100))
+        end
+        PO->>PO: subtotal < min_order_amount -> BELOW_MIN_ORDER
+        PO->>DB: INSERT orders (original_total=final_total=subtotal+fee, adjustment 0) ON CONFLICT idempotency_key DO NOTHING
+        PO->>DB: INSERT order_items (qty, unit_price, line_total)
+        PO->>DB: UPDATE products SET stock = stock - qty
+        DB-->>TRG: AFTER INSERT orders
+        TRG->>DB: INSERT order_status_history (new_status=PENDING, 'Order placed')
+        TRG->>DB: INSERT notification_outbox (admin new_order, customer order_placed)
+        PO-->>POA: {order_id, order_number, subtotal, delivery_fee, total, final_total}
+    end
+
+    alt result has error
+        POA-->>API: RAISE mapped 42501/22023 (e.g. SLOT_FULL -> "delivery slot full")
+    else success
+        POA->>DB: DELETE cart_items WHERE user_id = uid
+        POA-->>API: order_id uuid
+    end
+    API-->>CL: 200 order_id  (or 4xx mapped error)
+    CL->>C: navigate /orders/{id} (server-confirmed)
+
+%% ----------------------------------------------------------------------------
+%% FLOW 2 — Admin order lifecycle + item adjustment (reject / restore)
+%% ----------------------------------------------------------------------------
+sequenceDiagram
+    autonumber
+    actor A as Staff (OWNER/ADMIN/MANAGER/DELIVERY)
+    participant APP as Android (OrderDetailViewModel)
+    participant API as PostgREST (RPC)
+    participant AUOS as admin_update_order_status
+    participant AROI as admin_reject_order_item
+    participant GATE as private.can_manage_orders()
+    participant DB as Postgres (orders/order_items)
+    participant TRG as triggers (history + notify)
+
+    A->>APP: open order detail
+    APP->>API: SELECT order + order_items + order_status_history (staff RLS: can_view_orders)
+    API-->>APP: server row (final_total, items, timeline)
+    APP->>A: render exactly what the server returned
+
+    rect rgb(235,245,255)
+    Note over A,DB: Status transition
+    A->>APP: tap "Confirm" (CONFIRMED)
+    APP->>API: rpc admin_update_order_status {p_order_id, p_status, p_reason}
+    API->>AUOS: invoke (DEFINER, search_path='')
+    AUOS->>GATE: not can_manage_orders() -> 42501
+    AUOS->>DB: SELECT orders FOR UPDATE; same status -> 22023
+    AUOS->>DB: private.order_transition_allowed(from,to) -> else 22023
+    alt to CANCELLED and no reason
+        AUOS-->>API: 22023 "a cancellation reason is required"
+    end
+    AUOS->>DB: UPDATE orders SET status (+cancelled_at/cancel_reason)
+    DB-->>TRG: AFTER UPDATE OF status
+    TRG->>DB: INSERT order_status_history + notification_outbox (customer)
+    AUOS-->>API: updated orders row
+    API-->>APP: 200 (or 42501/22023)
+    APP->>APP: re-fetch order (never trust local guess)
+    APP->>A: new status shown only if server confirmed
+    end
+
+    rect rgb(255,245,235)
+    Note over A,DB: Reject an unavailable item (server-owned money)
+    A->>APP: open RejectItemSheet, pick item + reason
+    APP->>API: rpc admin_reject_order_item {p_item_id, p_reason}
+    API->>AROI: invoke (DEFINER, search_path='')
+    AROI->>GATE: not can_manage_orders() -> 42501
+    AROI->>DB: reason required, <=500 chars -> 22023
+    AROI->>DB: lock orders FOR UPDATE; status in (DELIVERED,CANCELLED) -> 22023
+    AROI->>DB: lock order_items; already rejected -> 22023
+    AROI->>DB: UPDATE order_items SET rejected=true, rejection_reason
+    AROI->>AROI: original_total := coalesce(orders.original_total, orders.total)
+    AROI->>AROI: adjustment_amount := -SUM(rejected line_total)   %% <= 0
+    AROI->>AROI: final_total := original_total + adjustment_amount  %% CHECK final=orig+adj
+    AROI->>DB: UPDATE orders SET original_total, adjustment_amount, final_total, adjustment_reason, adjusted_by, adjusted_at
+    AROI->>DB: INSERT notification_outbox (customer, revised bill)
+    AROI-->>API: updated orders row
+    API-->>APP: 200 (or error)
+    APP->>APP: re-fetch order; render server final_total verbatim
+    APP->>A: revised total shown (never locally computed)
+    end
+
+    Note over A,DB: Restore (admin_restore_order_item) is the inverse: clears rejection,
+    Note over A,DB: recomputes adjustment_amount, clears reason when back to 0, re-notifies.
+    Note over A,DB: Manual goodwill adjustment uses admin_adjust_order(p_order_id, p_adjustment_amount<=0, p_reason).

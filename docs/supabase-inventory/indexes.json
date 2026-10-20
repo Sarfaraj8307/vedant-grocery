@@ -1,0 +1,440 @@
+﻿[
+    {
+        "schemaname":  "public",
+        "tablename":  "addresses",
+        "indexname":  "addresses_one_default",
+        "indexdef":  "CREATE UNIQUE INDEX addresses_one_default ON public.addresses USING btree (user_id) WHERE is_default"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "addresses",
+        "indexname":  "addresses_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX addresses_pkey ON public.addresses USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "addresses",
+        "indexname":  "addresses_user_idx",
+        "indexdef":  "CREATE INDEX addresses_user_idx ON public.addresses USING btree (user_id)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "buckets",
+        "indexname":  "bname",
+        "indexdef":  "CREATE UNIQUE INDEX bname ON storage.buckets USING btree (name)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "buckets",
+        "indexname":  "buckets_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX buckets_pkey ON storage.buckets USING btree (id)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "buckets_analytics",
+        "indexname":  "buckets_analytics_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX buckets_analytics_pkey ON storage.buckets_analytics USING btree (id)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "buckets_analytics",
+        "indexname":  "buckets_analytics_unique_name_idx",
+        "indexdef":  "CREATE UNIQUE INDEX buckets_analytics_unique_name_idx ON storage.buckets_analytics USING btree (name) WHERE (deleted_at IS NULL)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "buckets_vectors",
+        "indexname":  "buckets_vectors_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX buckets_vectors_pkey ON storage.buckets_vectors USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "cart_items",
+        "indexname":  "cart_items_one_null",
+        "indexdef":  "CREATE UNIQUE INDEX cart_items_one_null ON public.cart_items USING btree (user_id, product_id) WHERE (weight_id IS NULL)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "cart_items",
+        "indexname":  "cart_items_one_weight",
+        "indexdef":  "CREATE UNIQUE INDEX cart_items_one_weight ON public.cart_items USING btree (user_id, product_id, weight_id) WHERE (weight_id IS NOT NULL)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "cart_items",
+        "indexname":  "cart_items_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX cart_items_pkey ON public.cart_items USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "cart_items",
+        "indexname":  "cart_items_user_idx",
+        "indexdef":  "CREATE INDEX cart_items_user_idx ON public.cart_items USING btree (user_id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "categories",
+        "indexname":  "categories_name_key",
+        "indexdef":  "CREATE UNIQUE INDEX categories_name_key ON public.categories USING btree (name)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "categories",
+        "indexname":  "categories_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX categories_pkey ON public.categories USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "categories",
+        "indexname":  "categories_slug_key",
+        "indexdef":  "CREATE UNIQUE INDEX categories_slug_key ON public.categories USING btree (slug)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaint_attachments",
+        "indexname":  "complaint_attachments_cid_idx",
+        "indexdef":  "CREATE INDEX complaint_attachments_cid_idx ON public.complaint_attachments USING btree (complaint_id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaint_attachments",
+        "indexname":  "complaint_attachments_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX complaint_attachments_pkey ON public.complaint_attachments USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaint_messages",
+        "indexname":  "complaint_messages_complaint_idx",
+        "indexdef":  "CREATE INDEX complaint_messages_complaint_idx ON public.complaint_messages USING btree (complaint_id, created_at)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaint_messages",
+        "indexname":  "complaint_messages_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX complaint_messages_pkey ON public.complaint_messages USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaints",
+        "indexname":  "complaints_order_id_idx",
+        "indexdef":  "CREATE INDEX complaints_order_id_idx ON public.complaints USING btree (order_id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaints",
+        "indexname":  "complaints_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX complaints_pkey ON public.complaints USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaints",
+        "indexname":  "complaints_status_idx",
+        "indexdef":  "CREATE INDEX complaints_status_idx ON public.complaints USING btree (status)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaints",
+        "indexname":  "complaints_user_idx",
+        "indexdef":  "CREATE INDEX complaints_user_idx ON public.complaints USING btree (user_id, created_at DESC)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "delivery_slots",
+        "indexname":  "delivery_slots_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX delivery_slots_pkey ON public.delivery_slots USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "delivery_slots",
+        "indexname":  "delivery_slots_starts_at_key",
+        "indexdef":  "CREATE UNIQUE INDEX delivery_slots_starts_at_key ON public.delivery_slots USING btree (starts_at) WHERE (starts_at IS NOT NULL)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "events",
+        "indexname":  "events_created_idx",
+        "indexdef":  "CREATE INDEX events_created_idx ON public.events USING btree (created_at)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "events",
+        "indexname":  "events_event_idx",
+        "indexdef":  "CREATE INDEX events_event_idx ON public.events USING btree (event, created_at)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "events",
+        "indexname":  "events_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX events_pkey ON public.events USING btree (id)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "migrations",
+        "indexname":  "migrations_name_key",
+        "indexdef":  "CREATE UNIQUE INDEX migrations_name_key ON storage.migrations USING btree (name)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "migrations",
+        "indexname":  "migrations_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX migrations_pkey ON storage.migrations USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notification_outbox",
+        "indexname":  "notification_outbox_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX notification_outbox_pkey ON public.notification_outbox USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notification_outbox",
+        "indexname":  "notification_outbox_user_idx",
+        "indexdef":  "CREATE INDEX notification_outbox_user_idx ON public.notification_outbox USING btree (user_id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notification_outbox",
+        "indexname":  "outbox_unread_idx",
+        "indexdef":  "CREATE INDEX outbox_unread_idx ON public.notification_outbox USING btree (audience, read_at) WHERE (read_at IS NULL)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notifications",
+        "indexname":  "notifications_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notifications",
+        "indexname":  "notifications_user_idx",
+        "indexdef":  "CREATE INDEX notifications_user_idx ON public.notifications USING btree (user_id, created_at DESC)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "indexname":  "idx_objects_bucket_id_name",
+        "indexdef":  "CREATE INDEX idx_objects_bucket_id_name ON storage.objects USING btree (bucket_id, name COLLATE \"C\")"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "indexname":  "idx_objects_bucket_id_name_lower",
+        "indexdef":  "CREATE INDEX idx_objects_bucket_id_name_lower ON storage.objects USING btree (bucket_id, lower(name) COLLATE \"C\")"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "indexname":  "idx_objects_current_version",
+        "indexdef":  "CREATE UNIQUE INDEX idx_objects_current_version ON storage.objects USING btree (bucket_id, name COLLATE \"C\") WHERE (archived_at IS NULL)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "indexname":  "idx_objects_delete_markers",
+        "indexdef":  "CREATE INDEX idx_objects_delete_markers ON storage.objects USING btree (bucket_id, name COLLATE \"C\") WHERE is_delete_marker"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "indexname":  "idx_objects_null_version",
+        "indexdef":  "CREATE UNIQUE INDEX idx_objects_null_version ON storage.objects USING btree (bucket_id, name COLLATE \"C\") WHERE (NOT is_versioned)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "indexname":  "name_prefix_search",
+        "indexdef":  "CREATE INDEX name_prefix_search ON storage.objects USING btree (name text_pattern_ops)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "indexname":  "objects_bucket_id_name_version_key",
+        "indexdef":  "CREATE UNIQUE INDEX objects_bucket_id_name_version_key ON storage.objects USING btree (bucket_id, name COLLATE \"C\", version) NULLS NOT DISTINCT"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "indexname":  "objects_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX objects_pkey ON storage.objects USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "offers",
+        "indexname":  "offers_active_idx",
+        "indexdef":  "CREATE INDEX offers_active_idx ON public.offers USING btree (is_active, starts_at, ends_at) WHERE is_active"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "offers",
+        "indexname":  "offers_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX offers_pkey ON public.offers USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "offers",
+        "indexname":  "offers_product_idx",
+        "indexdef":  "CREATE INDEX offers_product_idx ON public.offers USING btree (product_id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_items",
+        "indexname":  "order_items_order_idx",
+        "indexdef":  "CREATE INDEX order_items_order_idx ON public.order_items USING btree (order_id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_items",
+        "indexname":  "order_items_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX order_items_pkey ON public.order_items USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_items",
+        "indexname":  "order_items_product_idx",
+        "indexdef":  "CREATE INDEX order_items_product_idx ON public.order_items USING btree (product_id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_status_history",
+        "indexname":  "order_status_history_order_idx",
+        "indexdef":  "CREATE INDEX order_status_history_order_idx ON public.order_status_history USING btree (order_id, created_at)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_status_history",
+        "indexname":  "order_status_history_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX order_status_history_pkey ON public.order_status_history USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "indexname":  "orders_idempotency_key_key",
+        "indexdef":  "CREATE UNIQUE INDEX orders_idempotency_key_key ON public.orders USING btree (idempotency_key)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "indexname":  "orders_order_number_key",
+        "indexdef":  "CREATE UNIQUE INDEX orders_order_number_key ON public.orders USING btree (order_number)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "indexname":  "orders_pincode_idx",
+        "indexdef":  "CREATE INDEX orders_pincode_idx ON public.orders USING btree (pincode)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "indexname":  "orders_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX orders_pkey ON public.orders USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "indexname":  "orders_slot_date_idx",
+        "indexdef":  "CREATE INDEX orders_slot_date_idx ON public.orders USING btree (slot_id, delivery_date) WHERE (status \u003c\u003e \u0027CANCELLED\u0027::order_status)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "indexname":  "orders_status_idx",
+        "indexdef":  "CREATE INDEX orders_status_idx ON public.orders USING btree (status)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "indexname":  "orders_user_idx",
+        "indexdef":  "CREATE INDEX orders_user_idx ON public.orders USING btree (user_id, placed_at DESC)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "product_weights",
+        "indexname":  "product_weights_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX product_weights_pkey ON public.product_weights USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "product_weights",
+        "indexname":  "product_weights_product_id_grams_key",
+        "indexdef":  "CREATE UNIQUE INDEX product_weights_product_id_grams_key ON public.product_weights USING btree (product_id, grams)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "product_weights",
+        "indexname":  "product_weights_product_idx",
+        "indexdef":  "CREATE INDEX product_weights_product_idx ON public.product_weights USING btree (product_id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "products",
+        "indexname":  "products_category_idx",
+        "indexdef":  "CREATE INDEX products_category_idx ON public.products USING btree (category_id) WHERE is_active"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "products",
+        "indexname":  "products_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX products_pkey ON public.products USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "products",
+        "indexname":  "products_slug_key",
+        "indexdef":  "CREATE UNIQUE INDEX products_slug_key ON public.products USING btree (slug)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "profiles",
+        "indexname":  "profiles_phone_key",
+        "indexdef":  "CREATE UNIQUE INDEX profiles_phone_key ON public.profiles USING btree (phone)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "profiles",
+        "indexname":  "profiles_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "profiles",
+        "indexname":  "profiles_username_key",
+        "indexdef":  "CREATE UNIQUE INDEX profiles_username_key ON public.profiles USING btree (username)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "s3_multipart_uploads",
+        "indexname":  "idx_multipart_uploads_list",
+        "indexdef":  "CREATE INDEX idx_multipart_uploads_list ON storage.s3_multipart_uploads USING btree (bucket_id, key, created_at)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "s3_multipart_uploads",
+        "indexname":  "s3_multipart_uploads_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX s3_multipart_uploads_pkey ON storage.s3_multipart_uploads USING btree (id)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "s3_multipart_uploads_parts",
+        "indexname":  "s3_multipart_uploads_parts_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX s3_multipart_uploads_parts_pkey ON storage.s3_multipart_uploads_parts USING btree (id)"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "store_settings",
+        "indexname":  "store_settings_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX store_settings_pkey ON public.store_settings USING btree (id)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "vector_indexes",
+        "indexname":  "vector_indexes_name_bucket_id_idx",
+        "indexdef":  "CREATE UNIQUE INDEX vector_indexes_name_bucket_id_idx ON storage.vector_indexes USING btree (name, bucket_id)"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "vector_indexes",
+        "indexname":  "vector_indexes_pkey",
+        "indexdef":  "CREATE UNIQUE INDEX vector_indexes_pkey ON storage.vector_indexes USING btree (id)"
+    }
+]

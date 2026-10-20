@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pre-Android-12 backup rules. `android:allowBackup="false"` already disables
+  backup entirely; this file exists so the manifest reference resolves across
+  the whole supported API range (minSdk 26) and so the intent is explicit.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+</full-backup-content>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors the PWA `@theme` tokens in src/app/globals.css so the two apps
+         read as one brand. Keep in step with ui/theme/Color.kt. -->
+    <color name="vedant_paper">#FDFCF7</color>
+    <color name="vedant_leaf_600">#2A6B46</color>
+</resources>

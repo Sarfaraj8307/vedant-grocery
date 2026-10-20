@@ -1,0 +1,681 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { Check, Info, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/menu";
+import { Field, Input } from "@/components/ui/input";
+import { OrDivider } from "@/components/auth/auth-shell";
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  signInSchema,
+  signUpSchema,
+  usernameSchema,
+  type ForgotPasswordInput,
+  type ResetPasswordInput,
+  type SignInInput,
+  type SignUpInput,
+} from "@/lib/validation";
+import {
+  checkUsername,
+  sendPasswordReset,
+  signInWithGoogle,
+  signInWithPassword,
+  signUpWithPassword,
+  updatePassword,
+} from "@/services/auth-service";
+import { store } from "@/config/store";
+
+/**
+ * Auth forms.
+ *
+ * Every form is a real Supabase Auth call — there is no simulated success path.
+ * Provider errors are mapped to actionable copy by `friendlyAuthError`, and an
+ * unavailable provider (e.g. Google not yet enabled on the project) produces an
+ * explicit message rather than a silent no-op.
+ */
+
+/** Shared Google button. */
+function GoogleButton({ next, label }: { next: string; label: string }) {
+  const [working, setWorking] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  return (
+    <div>
+      <Button
+        type="button"
+        variant="outline"
+        block
+        loading={working}
+        loadingLabel="Opening Google…"
+        onClick={async () => {
+          setWorking(true);
+          setError(null);
+          const result = await signInWithGoogle(next);
+          if (!result.ok) {
+            setError(result.error);
+            setWorking(false);
+          }
+          // On success the browser is already navigating to Google.
+        }}
+      >
+        <GoogleGlyph />
+        {label}
+      </Button>
+      {error ? (
+        <p role="alert" className="mt-2 text-small text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function GoogleGlyph() {
+  return (
+    <svg viewBox="0 0 18 18" className="size-[18px]" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z"
+      />
+    </svg>
+  );
+}
+
+/** Where to send the customer after a successful auth. */
+function safeNext(raw: string | null): string {
+  if (!raw) return "/";
+  // Only same-origin relative paths — an open redirect via ?next= is a real,
+  // commonly-exploited bug and costs nothing to prevent.
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+}
+
+/* ========================================================================== */
+/* Sign in                                                                    */
+/* ========================================================================== */
+
+export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get("next"));
+  const confirmed = searchParams.get("confirmed") === "1";
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<SignInInput>({ resolver: zodResolver(signInSchema) });
+
+  async function onSubmit(values: SignInInput) {
+    const result = await signInWithPassword(values);
+    if (!result.ok) {
+      setError("root", { message: result.error });
+      return;
+    }
+    router.push(next);
+    router.refresh();
+  }
+
+  return (
+    <div>
+      {confirmed ? (
+        <p className="mb-4 flex items-start gap-2 rounded-md border border-success-bg bg-success-bg px-3 py-2.5 text-small text-success">
+          <Check className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          Your email is confirmed. Please sign in to continue.
+        </p>
+      ) : null}
+
+      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        {errors.root ? (
+          <p
+            role="alert"
+            className="mb-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
+          >
+            {errors.root.message}
+          </p>
+        ) : null}
+
+        <Field label="Email" htmlFor="email" error={errors.email?.message} required>
+          <Input
+            id="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoFocus
+            invalid={Boolean(errors.email)}
+            {...register("email")}
+          />
+        </Field>
+
+        <Field
+          label="Password"
+          htmlFor="password"
+          error={errors.password?.message}
+          required
+        >
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            invalid={Boolean(errors.password)}
+            {...register("password")}
+          />
+        </Field>
+
+        <div className="mb-4 flex justify-end">
+          <Link
+            href="/forgot-password"
+            className="text-small text-leaf-700 underline-offset-2 hover:underline"
+          >
+            Forgot your password?
+          </Link>
+        </div>
+
+        <Button type="submit" block size="lg" loading={isSubmitting} loadingLabel="Signing in…">
+          Sign in
+        </Button>
+      </form>
+
+      {/* Rendered only when the Supabase project actually has Google enabled
+          (probed server-side). A sign-in button that always errors would be a
+          fake control, which this project does not ship. */}
+      {googleEnabled ? (
+        <>
+          <OrDivider />
+          <GoogleButton next={next} label="Continue with Google" />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* Sign up                                                                    */
+/* ========================================================================== */
+
+export function SignUpForm({
+  googleEnabled = false,
+  nextPath,
+}: {
+  googleEnabled?: boolean;
+  /** Resolved server-side so the form does not depend on the query string. */
+  nextPath?: string;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(nextPath ?? searchParams.get("next"));
+
+  const [pendingConfirmation, setPendingConfirmation] = React.useState(false);
+  /** Result of the last completed lookup, tagged with the name it was for. */
+  const [lookup, setLookup] = React.useState<{
+    for: string;
+    available: boolean;
+  } | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    control,
+    formState: { errors, isSubmitting },
+  } = useForm<SignUpInput>({
+    resolver: zodResolver(signUpSchema),
+    // `acceptedTerms` is a `z.literal(true)`, so it must start unset — the form
+    // cannot be submitted without an explicit tick.
+    defaultValues: { acceptedTerms: false as unknown as true },
+  });
+
+  // `useWatch` rather than `form.watch()`: the latter returns an unmemoizable
+  // function, which makes the React Compiler skip this whole component.
+  const usernameWatch = useWatch({ control, name: "username" });
+  const usernameValue = (usernameWatch ?? "").trim().toLowerCase();
+  const usernameSyntaxValid =
+    usernameValue.length > 0 && usernameSchema.safeParse(usernameValue).success;
+
+  /**
+   * Live username availability via `check_username_available()`.
+   *
+   * Debounced to one request per 400ms of typing, and only fired once the name is
+   * syntactically valid — there is no point asking the server about `"a"`.
+   * The in-flight state is *derived* rather than stored, so nothing sets state
+   * synchronously during a render or effect body; only the resolved promise does.
+   */
+  React.useEffect(() => {
+    if (!usernameSyntaxValid) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void checkUsername(usernameValue).then((available) => {
+        if (cancelled) return;
+        setLookup({ for: usernameValue, available });
+      });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [usernameValue, usernameSyntaxValid]);
+
+  const usernameState: "idle" | "checking" | "free" | "taken" | "invalid" =
+    usernameValue.length === 0
+      ? "idle"
+      : !usernameSyntaxValid
+        ? "invalid"
+        : lookup?.for === usernameValue
+          ? lookup.available
+            ? "free"
+            : "taken"
+          : "checking";
+
+  async function onSubmit(values: SignUpInput) {
+    // Re-check server truth at submit time to close the race between the last
+    // debounced lookup and the submit click. If the name was taken in the
+    // meantime, block the submit with an actionable message rather than letting
+    // the database 23505 bubble as a generic error.
+    const submitName = values.username.trim().toLowerCase();
+    if (usernameState === "taken") {
+      const stillTaken = !(await checkUsername(submitName));
+      if (stillTaken) {
+        setError("username", { message: "That username is already taken" });
+        return;
+      }
+    } else if (usernameState === "checking") {
+      const available = await checkUsername(submitName);
+      if (!available) {
+        setError("username", { message: "That username is already taken" });
+        return;
+      }
+    }
+
+    const result = await signUpWithPassword({
+      email: values.email,
+      password: values.password,
+      firstName: values.firstName,
+      lastName: values.lastName ?? "",
+      username: values.username,
+    });
+
+    if (!result.ok) {
+      setError("root", { message: result.error });
+      return;
+    }
+
+    if (result.data.needsEmailConfirmation) {
+      setPendingConfirmation(true);
+      return;
+    }
+
+    router.push(next);
+    router.refresh();
+  }
+
+  if (pendingConfirmation) {
+    return (
+      <div className="rounded-lg border border-line bg-surface p-5 shadow-xs">
+        <h2 className="font-display text-h3 text-ink">
+          Check your inbox to confirm
+        </h2>
+        <p className="mt-2 text-body text-ink-muted">
+          We have sent a confirmation link to your email address. Open it and you
+          will be signed in automatically — then you can start shopping.
+        </p>
+        <p className="mt-3 text-small text-ink-subtle">
+          Nothing arrived? Check your spam folder, or{" "}
+          <Link href="/login" className="text-leaf-700 underline underline-offset-2">
+            try signing in
+          </Link>{" "}
+          and we will send a new link.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        {errors.root ? (
+          <p
+            role="alert"
+            className="mb-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
+          >
+            {errors.root.message}
+          </p>
+        ) : null}
+
+        <div className="grid gap-x-3 sm:grid-cols-2">
+          <Field
+            label="First name"
+            htmlFor="firstName"
+            error={errors.firstName?.message}
+            required
+          >
+            <Input
+              id="firstName"
+              autoComplete="given-name"
+              autoFocus
+              invalid={Boolean(errors.firstName)}
+              {...register("firstName")}
+            />
+          </Field>
+          <Field label="Last name" htmlFor="lastName" error={errors.lastName?.message}>
+            <Input
+              id="lastName"
+              autoComplete="family-name"
+              invalid={Boolean(errors.lastName)}
+              {...register("lastName")}
+            />
+          </Field>
+        </div>
+
+        <Field label="Email" htmlFor="signup-email" error={errors.email?.message} required>
+          <Input
+            id="signup-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            invalid={Boolean(errors.email)}
+            {...register("email")}
+          />
+        </Field>
+
+        <Field
+          label="Username"
+          htmlFor="username"
+          error={errors.username?.message}
+          hint="Used to identify you to the shop. Lowercase letters, numbers and underscores."
+          required
+        >
+          <div className="relative">
+            <Input
+              id="username"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              invalid={Boolean(errors.username) || usernameState === "taken"}
+              {...register("username")}
+            />
+            <UsernameStatus state={usernameState} />
+          </div>
+        </Field>
+
+        <Field
+          label="Password"
+          htmlFor="signup-password"
+          error={errors.password?.message}
+          hint="At least 8 characters."
+          required
+        >
+          <Input
+            id="signup-password"
+            type="password"
+            autoComplete="new-password"
+            invalid={Boolean(errors.password)}
+            {...register("password")}
+          />
+        </Field>
+
+        <div className="mb-4">
+          <label className="flex cursor-pointer items-start gap-2.5">
+            {/* Radix Checkbox is not a native input, so it is wired through
+                react-hook-form's Controller rather than `register`. */}
+            <Controller
+              name="acceptedTerms"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  className="mt-0.5"
+                  aria-describedby="terms-note"
+                  checked={field.value === true}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
+            />
+            <span id="terms-note" className="text-small text-ink-muted">
+              I agree to the{" "}
+              <Link href="/terms" className="text-leaf-700 underline underline-offset-2">
+                terms
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-leaf-700 underline underline-offset-2">
+                privacy policy
+              </Link>
+              .
+            </span>
+          </label>
+          {errors.acceptedTerms ? (
+            <p role="alert" className="mt-1 text-small text-danger">
+              {errors.acceptedTerms.message}
+            </p>
+          ) : null}
+        </div>
+
+        <Button type="submit" block size="lg" loading={isSubmitting} loadingLabel="Creating account…">
+          Create account
+        </Button>
+      </form>
+
+      {googleEnabled ? (
+        <>
+          <OrDivider />
+          <GoogleButton next={next} label="Continue with Google" />
+        </>
+      ) : null}
+
+      <p className="mt-4 flex items-start gap-1.5 text-small text-ink-subtle">
+        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+        We only use your details to deliver your orders and reach you about them.
+        {store.needsOwnerConfiguration ? "" : ` You can reach ${store.name} any time from the contact page.`}
+      </p>
+    </div>
+  );
+}
+
+function UsernameStatus({
+  state,
+}: {
+  state: "idle" | "checking" | "free" | "taken" | "invalid";
+}) {
+  if (state === "idle") return null;
+
+  const config = {
+    checking: { text: "Checking…", className: "text-ink-subtle", Icon: null },
+    free: {
+      text: "Available",
+      className: "text-success",
+      Icon: Check,
+    },
+    taken: { text: "Already taken", className: "text-danger", Icon: X },
+    invalid: { text: "3–24 chars: a–z, 0–9, _", className: "text-ink-subtle", Icon: null },
+  }[state];
+
+  const Icon = config.Icon;
+
+  return (
+    <span
+      aria-live="polite"
+      className={`pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 text-small ${config.className}`}
+    >
+      {Icon ? <Icon className="size-3.5" strokeWidth={3} aria-hidden="true" /> : null}
+      {config.text}
+    </span>
+  );
+}
+
+/* ========================================================================== */
+/* Forgot password                                                            */
+/* ========================================================================== */
+
+export function ForgotPasswordForm() {
+  const [sent, setSent] = React.useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<ForgotPasswordInput>({ resolver: zodResolver(forgotPasswordSchema) });
+
+  async function onSubmit(values: ForgotPasswordInput) {
+    const result = await sendPasswordReset(values.email);
+    if (!result.ok) {
+      setError("root", { message: result.error });
+      return;
+    }
+    setSent(true);
+  }
+
+  if (sent) {
+    return (
+      <div className="rounded-lg border border-line bg-surface p-5 shadow-xs">
+        <h2 className="font-display text-h3 text-ink">Check your email</h2>
+        <p className="mt-2 text-body text-ink-muted">
+          If an account exists for that address, we have sent a link to reset your
+          password. The link is valid for one hour.
+        </p>
+        <p className="mt-3 text-small text-ink-subtle">
+          We show this same message for any address, so nobody can use this form
+          to find out who shops with us.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      {errors.root ? (
+        <p
+          role="alert"
+          className="mb-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
+        >
+          {errors.root.message}
+        </p>
+      ) : null}
+
+      <Field label="Email" htmlFor="reset-email" error={errors.email?.message} required>
+        <Input
+          id="reset-email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          autoFocus
+          invalid={Boolean(errors.email)}
+          {...register("email")}
+        />
+      </Field>
+
+      <Button type="submit" block size="lg" loading={isSubmitting} loadingLabel="Sending link…">
+        Send reset link
+      </Button>
+    </form>
+  );
+}
+
+/* ========================================================================== */
+/* Reset password (post-recovery)                                             */
+/* ========================================================================== */
+
+export function ResetPasswordForm() {
+  const router = useRouter();
+  const [done, setDone] = React.useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<ResetPasswordInput>({ resolver: zodResolver(resetPasswordSchema) });
+
+  async function onSubmit(values: ResetPasswordInput) {
+    const result = await updatePassword(values.password);
+    if (!result.ok) {
+      setError("root", { message: result.error });
+      return;
+    }
+    setDone(true);
+    window.setTimeout(() => {
+      router.push("/account");
+      router.refresh();
+    }, 1500);
+  }
+
+  if (done) {
+    return (
+      <p
+        role="status"
+        className="rounded-md border border-success-bg bg-success-bg px-3 py-2.5 text-small text-success"
+      >
+        Your password has been updated. Taking you to your account…
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      {errors.root ? (
+        <p
+          role="alert"
+          className="mb-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
+        >
+          {errors.root.message}
+        </p>
+      ) : null}
+
+      <Field
+        label="New password"
+        htmlFor="new-password"
+        error={errors.password?.message}
+        hint="At least 8 characters."
+        required
+      >
+        <Input
+          id="new-password"
+          type="password"
+          autoComplete="new-password"
+          autoFocus
+          invalid={Boolean(errors.password)}
+          {...register("password")}
+        />
+      </Field>
+
+      <Field
+        label="Confirm new password"
+        htmlFor="confirm-password"
+        error={errors.confirmPassword?.message}
+        required
+      >
+        <Input
+          id="confirm-password"
+          type="password"
+          autoComplete="new-password"
+          invalid={Boolean(errors.confirmPassword)}
+          {...register("confirmPassword")}
+        />
+      </Field>
+
+      <Button type="submit" block size="lg" loading={isSubmitting} loadingLabel="Updating…">
+        Update password
+      </Button>
+    </form>
+  );
+}

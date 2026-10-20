@@ -1,0 +1,92 @@
+﻿[
+    {
+        "table_name":  "addresses",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "cart_items",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "categories",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "complaint_attachments",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "complaint_messages",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "complaints",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "delivery_slots",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "events",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "notification_outbox",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "notifications",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "offers",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "order_items",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "order_status_history",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "orders",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "product_weights",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "products",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "profiles",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    },
+    {
+        "table_name":  "store_settings",
+        "rls_enabled":  true,
+        "rls_forced":  false
+    }
+]

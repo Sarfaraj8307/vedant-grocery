@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Launch theme. Compose owns the real surface; this only needs to match the
+      brand background so there is no white flash before the first frame.
+      `paper` = #fdfcf7, the same token the PWA uses.
+    -->
+    <style name="Theme.VedantAdmin" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/vedant_paper</item>
+        <item name="android:statusBarColor">@color/vedant_paper</item>
+        <item name="android:navigationBarColor">@color/vedant_paper</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

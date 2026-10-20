@@ -1,0 +1,462 @@
+﻿[
+    {
+        "schemaname":  "public",
+        "tablename":  "addresses",
+        "policyname":  "addresses_owner_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "(auth.uid() = user_id)",
+        "with_check":  "(auth.uid() = user_id)",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "cart_items",
+        "policyname":  "cart_items_owner_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "(auth.uid() = user_id)",
+        "with_check":  "(auth.uid() = user_id)",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "categories",
+        "policyname":  "categories_admin_write",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "categories",
+        "policyname":  "categories_read_public",
+        "roles":  "{anon,authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "is_active",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaint_attachments",
+        "policyname":  "complaint_attachments_admin_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaint_attachments",
+        "policyname":  "complaint_attachments_owner_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "(EXISTS ( SELECT 1\n   FROM complaints c\n  WHERE ((c.id = complaint_attachments.complaint_id) AND (c.user_id = auth.uid()))))",
+        "with_check":  "(EXISTS ( SELECT 1\n   FROM complaints c\n  WHERE ((c.id = complaint_attachments.complaint_id) AND (c.user_id = auth.uid()))))",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaint_messages",
+        "policyname":  "complaint_messages_admin_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaint_messages",
+        "policyname":  "complaint_messages_owner",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "(EXISTS ( SELECT 1\n   FROM complaints c\n  WHERE ((c.id = complaint_messages.complaint_id) AND (c.user_id = auth.uid()))))",
+        "with_check":  "(EXISTS ( SELECT 1\n   FROM complaints c\n  WHERE ((c.id = complaint_messages.complaint_id) AND (c.user_id = auth.uid()))))",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaints",
+        "policyname":  "complaints_admin_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "complaints",
+        "policyname":  "complaints_owner_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "(auth.uid() = user_id)",
+        "with_check":  "(auth.uid() = user_id)",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "delivery_slots",
+        "policyname":  "delivery_slots_admin_write",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "delivery_slots",
+        "policyname":  "delivery_slots_read_public",
+        "roles":  "{anon,authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "is_active",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "events",
+        "policyname":  "events_insert_any",
+        "roles":  "{anon,authenticated}",
+        "cmd":  "INSERT",
+        "qual":  "",
+        "with_check":  "true",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notification_outbox",
+        "policyname":  "notification_outbox_admin_read",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "is_admin()",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notification_outbox",
+        "policyname":  "notification_outbox_select_own",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "(user_id = auth.uid())",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notifications",
+        "policyname":  "notifications_owner_select",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "(auth.uid() = user_id)",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "notifications",
+        "policyname":  "notifications_owner_update",
+        "roles":  "{authenticated}",
+        "cmd":  "UPDATE",
+        "qual":  "(auth.uid() = user_id)",
+        "with_check":  "(auth.uid() = user_id)",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "offers",
+        "policyname":  "offers_admin_write",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "offers",
+        "policyname":  "offers_read_public",
+        "roles":  "{anon,authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "true",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_items",
+        "policyname":  "order_items_admin_select",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "is_admin()",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_items",
+        "policyname":  "order_items_insert_via_order",
+        "roles":  "{authenticated}",
+        "cmd":  "INSERT",
+        "qual":  "",
+        "with_check":  "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.id = order_items.order_id) AND (o.user_id = auth.uid()))))",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_items",
+        "policyname":  "order_items_owner_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.id = order_items.order_id) AND (o.user_id = auth.uid()))))",
+        "with_check":  "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.id = order_items.order_id) AND (o.user_id = auth.uid()))))",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_items",
+        "policyname":  "order_items_select_via_order",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.id = order_items.order_id) AND (o.user_id = auth.uid()))))",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_status_history",
+        "policyname":  "order_status_history_admin_select",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "is_admin()",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "order_status_history",
+        "policyname":  "order_status_history_owner",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.id = order_status_history.order_id) AND (o.user_id = auth.uid()))))",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "policyname":  "orders_admin_select",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "is_admin()",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "policyname":  "orders_insert_own",
+        "roles":  "{authenticated}",
+        "cmd":  "INSERT",
+        "qual":  "",
+        "with_check":  "(auth.uid() = user_id)",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "policyname":  "orders_select_own",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "(auth.uid() = user_id)",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "orders",
+        "policyname":  "orders_update_own",
+        "roles":  "{authenticated}",
+        "cmd":  "UPDATE",
+        "qual":  "(auth.uid() = user_id)",
+        "with_check":  "(auth.uid() = user_id)",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "product_weights",
+        "policyname":  "product_weights_admin_write",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "product_weights",
+        "policyname":  "product_weights_read_public",
+        "roles":  "{anon,authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "true",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "products",
+        "policyname":  "products_admin_write",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "products",
+        "policyname":  "products_read_public",
+        "roles":  "{anon,authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "is_active",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "profiles",
+        "policyname":  "profiles_admin_all",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "profiles",
+        "policyname":  "profiles_insert_own",
+        "roles":  "{authenticated}",
+        "cmd":  "INSERT",
+        "qual":  "",
+        "with_check":  "(auth.uid() = id)",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "profiles",
+        "policyname":  "profiles_select_own",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "(auth.uid() = id)",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "profiles",
+        "policyname":  "profiles_update_own",
+        "roles":  "{authenticated}",
+        "cmd":  "UPDATE",
+        "qual":  "(auth.uid() = id)",
+        "with_check":  "((auth.uid() = id) AND (role = ( SELECT p.role\n   FROM profiles p\n  WHERE (p.id = auth.uid()))))",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "store_settings",
+        "policyname":  "store_settings_admin_write",
+        "roles":  "{authenticated}",
+        "cmd":  "ALL",
+        "qual":  "is_admin()",
+        "with_check":  "is_admin()",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "public",
+        "tablename":  "store_settings",
+        "policyname":  "store_settings_read_public",
+        "roles":  "{anon,authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "true",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "policyname":  "complaint_images_admin_delete",
+        "roles":  "{authenticated}",
+        "cmd":  "DELETE",
+        "qual":  "((bucket_id = \u0027complaint-images\u0027::text) AND is_admin())",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "policyname":  "complaint_images_owner_insert",
+        "roles":  "{authenticated}",
+        "cmd":  "INSERT",
+        "qual":  "",
+        "with_check":  "((bucket_id = \u0027complaint-images\u0027::text) AND (is_admin() OR ((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text)))",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "policyname":  "complaint_images_read",
+        "roles":  "{authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "((bucket_id = \u0027complaint-images\u0027::text) AND (is_admin() OR ((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text)))",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "policyname":  "product_images_admin_delete",
+        "roles":  "{authenticated}",
+        "cmd":  "DELETE",
+        "qual":  "((bucket_id = \u0027product-images\u0027::text) AND is_admin())",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "policyname":  "product_images_admin_insert",
+        "roles":  "{authenticated}",
+        "cmd":  "INSERT",
+        "qual":  "",
+        "with_check":  "((bucket_id = \u0027product-images\u0027::text) AND is_admin())",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "policyname":  "product_images_admin_update",
+        "roles":  "{authenticated}",
+        "cmd":  "UPDATE",
+        "qual":  "((bucket_id = \u0027product-images\u0027::text) AND is_admin())",
+        "with_check":  "((bucket_id = \u0027product-images\u0027::text) AND is_admin())",
+        "permissive":  "PERMISSIVE"
+    },
+    {
+        "schemaname":  "storage",
+        "tablename":  "objects",
+        "policyname":  "product_images_public_read",
+        "roles":  "{anon,authenticated}",
+        "cmd":  "SELECT",
+        "qual":  "(bucket_id = \u0027product-images\u0027::text)",
+        "with_check":  "",
+        "permissive":  "PERMISSIVE"
+    }
+]
