@@ -298,3 +298,55 @@ A simulated authenticated customer (`SET LOCAL ROLE authenticated` + `request.jw
 
 **Migration ledger.** `supabase_migrations.schema_migrations` was missing all six manual `20261016_00{1..6}` migrations (only the 15 CLI-era rows were present). Recorded (idempotent, `on conflict (version) do nothing`) with `version = 20261016_00X`, `name` = the file's descriptive part, `statements` = the file body verbatim, `created_by = 'platform-remediation (management-api)'`. Note: the filenames use an `NNN` suffix rather than the CLI's 14-digit convention, so they were applied through the Management API and are recorded here for provenance rather than for CLI `db push` de-duplication.
 
+
+---
+
+### T14 — DB serviceability + close the `order_items` UPDATE/DELETE surface
+
+Two ceilings on the order path, both found by QA. Both reproduced live, both fixed in one migration, both re-verified after applying. **Not from the three Advisor exports — the count stays 98.**
+
+**Finding 1 — serviceability was app-layer only (`place_order_app` bypass).** The "do we deliver here?" rule lived only in `src/lib/serviceability.ts` + the checkout Server Action. `public.place_order_app(text,uuid,uuid)` had no serviceability knowledge, so a hand-crafted PostgREST call placed an order for an address we do not serve.
+
+**Finding 2 — a customer could rewrite their own order's line items.** `public.order_items :: order_items_update` and `order_items_delete` both had `EXISTS (select 1 from orders o where o.id = order_items.order_id and o.user_id = (select auth.uid()))`. A simulated customer ran `update public.order_items set unit_price = 0.01 where order_id = '<their own order>'` and it **SUCCEEDED** (2 rows) — as did a `DELETE` (2 rows). Note `line_total` is a **GENERATED** column, so only `unit_price` (and the other plain columns) are craftable; severity is lower than the INSERT hole closed in T13 because no trigger recomputes `orders.subtotal/total/final_total` from `order_items` (verified), so the customer could not lower their bill — but the history was falsifiable, which brief §17 forbids.
+
+**Fix.** `supabase/migrations/20261016_007_serviceability_and_close_item_mutation.sql`:
+
+1. New table `public.service_areas (id, city, state, pincode_prefixes text[], is_active, created_at, updated_at)`, seeded with **Pune / Maharashtra / `{411}`**, RLS on, unique index on `(lower(btrim(city)), lower(btrim(state)))`, `<table>_updated` trigger, and a `for select to authenticated` policy using `(is_active or private.can_view_orders())`. Its ACL matches the house pattern exactly (`anon/authenticated/service_role = arwdDxtm`) via the existing default ACL on `public`. This is the concrete answer to brief §35 ("prepare the database architecture for future expansion to other cities") — adding a city is one INSERT, no code change.
+2. New `private.address_is_serviceable(city, pincode)` — a faithful port of the client rule in `src/lib/serviceability.ts`: (1) a recognised city is authoritative and a present pincode must agree with it; (2) failing that, a pincode inside an active area still resolves; (3) otherwise not served. `EXECUTE` is revoked from `public`/`anon`/`authenticated` (internal helper, matching `set_updated_at` hygiene).
+3. `public.place_order_app` gains a guard **before any order work** (after auth/account-status/request-id validation): it resolves the caller's own address and raises `22023 'delivery area not served'` when not serviceable. When the address is absent or not owned by the caller it stays silent, so the existing `INVALID_ADDRESS` path is unchanged. The 3-arg `public.place_order(text,uuid,uuid)` is a thin wrapper over `place_order_app`, so it is covered too; the 5-arg engine `place_order(uuid,uuid,uuid,date,jsonb)` is **not reachable by `authenticated`** (`has_function_privilege('authenticated', …, 'EXECUTE')` = false), so the guard closes every customer-reachable path.
+4. `drop policy if exists order_items_update / order_items_delete`. Line-item mutation keeps exactly one path — `admin_reject_order_item` / `admin_restore_order_item`, both `SECURITY DEFINER` owned by `postgres`; `order_items` is `postgres`-owned with `relforcerowsecurity = false`, so those DEFINER bodies bypass RLS on their own `UPDATE`s.
+
+**Proof (empirical, every batch ends in `ROLLBACK`; `SET LOCAL ROLE authenticated` + `request.jwt.claims` to simulate the customer and the admin).**
+
+Phase 1 — **before** (no DDL), reproducing both holes:
+
+| Probe (as the authenticated customer) | Result |
+|---|---|
+| `place_order_app(req, out-of-area Mumbai 400001, slot)` | **PLACED** — bypass reproduced |
+| `update order_items set unit_price=0.01` on their own order | **SUCCEEDED**, 2 rows |
+| `delete order_items` on their own order | **SUCCEEDED**, 2 rows |
+| `order_items` policies | `order_items_delete, order_items_select, order_items_update` |
+| `service_areas` exists | **no** |
+
+Phase 2 — **after** (the migration's DDL applied *inside* the txn, then rolled back):
+
+| # | Probe | Result |
+|---|---|---|
+| 1 | `place_order_app(out-of-area)` | **22023 `delivery area not served`** |
+| 2 | `place_order_app(in-area Pune 411001)` | **PLACED** — legit path intact |
+| 3 | customer direct `UPDATE order_items` | **0 rows**, `unit_price` unchanged (`40.00`) |
+| 4 | customer direct `DELETE order_items` | **0 rows**, both items still present |
+| 5 | `admin_reject_order_item` (as the ADMIN) | **`rejected = true`** |
+| 6 | `admin_restore_order_item` | **`rejected = false`** |
+| 7 | `order_items` policies | `order_items_select` only |
+| 8–9 | `service_areas` | 1 active row, `Pune/Maharashtra/{411}` |
+
+**Post-apply verification (persistent).** Re-ran the same six probes live against the real database with the migration applied, all inside `ROLLBACK`: out-of-area → `22023`; in-area → **PLACED**; customer `UPDATE` → **0 rows**; customer `DELETE` → **0 rows**; admin reject → `rejected=true`; admin restore → `rejected=false`. `place_order_app`'s live definition contains both the `delivery area not served` raise and the `address_is_serviceable` call; the helper exists and `has_function_privilege('authenticated', …, 'EXECUTE')` is **false**; the trigger and unique index exist. A signed-in customer reads `Pune, Maharashtra` from `service_areas`; `anon` sees **0 rows**. Live counts unchanged (no test rows persisted).
+
+An RLS-blocked `UPDATE`/`DELETE` affects **0 rows** rather than raising `42501` (default-deny, because no policy applies) — which is why the proof asserts on row count plus a value read-back rather than on an error.
+
+**Policy/ACL blast radius.** Full `pg_policies` snapshots before and after are identical except: **removed** `order_items.order_items_delete[DELETE]` and `order_items.order_items_update[UPDATE]`, **added** `service_areas.service_areas_select[SELECT]`. No other policy changed, and no ACL changed on any existing object (the new table's grants come from the pre-existing default ACL on `public`, matching `orders`/`offers`/`addresses` exactly).
+
+**Migration ledger.** `20261016_007` / `serviceability_and_close_item_mutation` present in `supabase_migrations.schema_migrations` (recorded idempotently, `on conflict (version) do nothing`), same `created_by = 'platform-remediation (management-api)'` convention as T13.
+
+**Note.** Migration 007 rewrites `place_order_app` in full. Verified by grep that no later migration (`008_delivery_assignment_and_rpc_gates`, `009_order_acceptance`, `010_realtime`, `011_delivery_coordinates`, `012_staff_roster`) defines `place_order_app`, and the live definition is 4 707 chars containing the guard — so nothing of theirs was clobbered.

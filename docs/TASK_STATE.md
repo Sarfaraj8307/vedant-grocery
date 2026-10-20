@@ -111,3 +111,27 @@ QA surfaced a defect the three Advisor exports never flagged: an `authenticated`
 **Blast radius (grep-verified):** every `orders` / `order_items` reference in `src/` (web) and `admin-android/` (Kotlin) is a `SELECT`; no client writes to either table. `order_status_history` already had no customer `INSERT` policy.
 
 **Migration ledger.** `supabase_migrations.schema_migrations` was missing all six manual `20261016_00{1..6}` migrations; recorded idempotently (`version = 20261016_00X`, `name` = descriptive, `statements` = file body, `created_by = 'platform-remediation (management-api)'`). Details in `docs/SUPABASE_FINDING_REGISTER.md` §T13.
+
+## T14 — DB serviceability + close the `order_items` UPDATE/DELETE surface (2026-10-17, software-engineer)
+
+Two client-bypassable ceilings on the order path, both QA-found and both fixed in `supabase/migrations/20261016_007_serviceability_and_close_item_mutation.sql`.
+
+**Finding 1 — serviceability was app-layer only.** The "do we deliver here?" rule existed only in `src/lib/serviceability.ts` + the checkout Server Action, so a hand-crafted `place_order_app` RPC call placed an order for an out-of-area address.
+
+**Finding 2 — customers could rewrite their own order's lines.** `order_items_update` / `order_items_delete` both allowed `EXISTS (own order)`, so a customer could `UPDATE order_items SET unit_price = 0.01` (2 rows) or `DELETE` (2 rows). `line_total` is GENERATED; no trigger recomputes `orders` totals from `order_items`, so the bill could not be lowered — but history was falsifiable, violating brief §17.
+
+**Fix.**
+1. New `public.service_areas (id, city, state, pincode_prefixes text[], is_active, created_at, updated_at)`, seeded **Pune / Maharashtra / `{411}`**, RLS + a `to authenticated` SELECT policy, unique index, `set_updated_at` trigger. Answers brief §35 — a new city is one INSERT.
+2. New `private.address_is_serviceable(city, pincode)` — a faithful port of the client rule; EXECUTE revoked from client roles.
+3. `place_order_app` now raises `22023 'delivery area not served'` before any order work. The 3-arg `place_order` wrapper inherits it; the 5-arg engine is unreachable by `authenticated` (`has_function_privilege` = false).
+4. Dropped `order_items_update` and `order_items_delete`; `admin_reject_order_item` / `admin_restore_order_item` keep working (SECURITY DEFINER, `postgres`-owned, `relforcerowsecurity = false`).
+
+**Proof (empirical, every batch ends in `ROLLBACK`).** *Before:* out-of-area `place_order_app` **PLACED**; customer `UPDATE order_items` **2 rows**; customer `DELETE` **2 rows**. *After (DDL applied in-txn, then rolled back):* out-of-area → **22023 `delivery area not served`**; in-area → **PLACED**; customer `UPDATE` → **0 rows** (`unit_price` still `40.00`); customer `DELETE` → **0 rows** (2 items left); `admin_reject_order_item` → `rejected=true`; `admin_restore_order_item` → `rejected=false`.
+
+**Verification after applying (persistent).** The same six probes re-run live, all in `ROLLBACK`, gave identical results. `order_items` policies = `order_items_select` only; `place_order_app`'s live definition contains the guard and the helper call; the helper is not executable by `authenticated`; the trigger and unique index exist; a signed-in customer reads `Pune, Maharashtra`, `anon` reads 0 rows. No test rows persisted.
+
+**Blast radius.** Full `pg_policies` before/after differ by exactly two removals (`order_items.order_items_delete`, `order_items.order_items_update`) and one addition (`service_areas.service_areas_select`). No existing ACL changed — the new table's grants come from the pre-existing default ACL on `public`. An RLS-blocked `UPDATE`/`DELETE` affects 0 rows (default-deny) rather than raising `42501`, so the proof asserts on row count plus a value read-back.
+
+**Migration ledger.** `20261016_007` recorded in `supabase_migrations.schema_migrations` (idempotent, `on conflict (version) do nothing`), `created_by = 'platform-remediation (management-api)'`. Verified by grep that no later migration (008–012) defines `place_order_app`, so nothing was clobbered.
+
+Details in `docs/SUPABASE_FINDING_REGISTER.md` §T14.
