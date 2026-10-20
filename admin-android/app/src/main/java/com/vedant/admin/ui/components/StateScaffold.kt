@@ -63,6 +63,11 @@ enum class ContentPhase { Loading, Data, Empty, Error }
  *    an operational action — motion here is purely cosmetic.
  *
  * When [phase] is [ContentPhase.Data] the caller's [content] is shown.
+ *
+ * @param loadingContent optional **skeleton** for the loading phase — a screen
+ *   whose shape is knowable (a list of cards) should show its own skeleton so
+ *   the layout does not jump when data lands. When omitted, the default
+ *   spinner + "Loading…" still applies (right for genuinely shapeless loads).
  */
 @Composable
 fun StateScaffold(
@@ -74,6 +79,7 @@ fun StateScaffold(
     emptyMessage: String? = null,
     errorMessage: String? = null,
     onRetry: (() -> Unit)? = null,
+    loadingContent: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -93,7 +99,7 @@ fun StateScaffold(
             modifier = Modifier.fillMaxSize(),
         ) { current ->
             when (current) {
-                ContentPhase.Loading -> LoadingState()
+                ContentPhase.Loading -> loadingContent?.invoke() ?: LoadingState()
                 ContentPhase.Empty ->
                     CenteredMessage(
                         icon = emptyIcon,

@@ -14,6 +14,7 @@ import com.vedant.admin.feature.dashboard.DashboardViewModel
 import com.vedant.admin.feature.delivery.DeliveryViewModel
 import com.vedant.admin.feature.orders.detail.OrderDetailViewModel
 import com.vedant.admin.feature.orders.list.OrdersListViewModel
+import com.vedant.admin.feature.settings.appearance.AppearanceViewModel
 import com.vedant.admin.feature.settings.profile.ProfileViewModel
 import com.vedant.admin.feature.settings.store.StoreSettingsViewModel
 import com.vedant.admin.feature.slots.SlotsViewModel
@@ -97,7 +98,14 @@ class AppViewModelFactory(private val container: AppContainer) : ViewModelProvid
                 StoreSettingsViewModel(container.storeSettingsRepository)
 
             modelClass.isAssignableFrom(ProfileViewModel::class.java) ->
-                ProfileViewModel(container.profileRepository, container.authRepository)
+                ProfileViewModel(
+                    container.profileRepository,
+                    container.authRepository,
+                    container.appearanceRepository,
+                )
+
+            modelClass.isAssignableFrom(AppearanceViewModel::class.java) ->
+                AppearanceViewModel(container.appearanceRepository)
 
             else -> error("Unknown ViewModel: ${modelClass.name}")
         }

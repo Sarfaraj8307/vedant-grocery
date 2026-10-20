@@ -8,8 +8,10 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.vedant.admin.domain.model.AppearanceMode
 
 /**
  * Colour scheme.
@@ -128,6 +130,20 @@ fun VedantAdminTheme(
         )
     }
 }
+
+/**
+ * The operator's persisted appearance choice (§8).
+ *
+ * Provided once at the `MainActivity` boundary (where `LocalReduceMotion` is
+ * provided) and read anywhere below it — e.g. by the settings screen that
+ * shows which option is currently active. It is the composition-local mirror
+ * of `AppearanceRepository.mode`; the repository stays the source of truth
+ * and this local only avoids threading the value through every screen.
+ *
+ * Defaults to [AppearanceMode.SYSTEM_DEFAULT] so a screen rendered outside the
+ * provider (a preview) simply follows the system.
+ */
+val LocalAppearanceMode = staticCompositionLocalOf { AppearanceMode.SYSTEM_DEFAULT }
 
 /** Shorthand accessors so screens read `Spacing.md`, not `LocalSpacing.current.md`. */
 object VedantTheme {

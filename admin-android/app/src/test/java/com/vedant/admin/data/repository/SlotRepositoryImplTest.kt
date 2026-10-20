@@ -232,6 +232,8 @@ class SlotRepositoryImplTest {
 
         override suspend fun setOrderAcceptance(accepting: Boolean, reason: String?) = Unit
 
+        override suspend fun reportDeliveryIssue(orderId: String, type: String, reason: String) = Unit
+
         override suspend fun adminSlotLoad(from: String, days: Int): List<SlotLoadDto> {
             calls += "load:$from:$days"
             return loadRows

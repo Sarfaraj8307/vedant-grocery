@@ -29,6 +29,7 @@ import com.vedant.admin.feature.dashboard.DashboardScreen
 import com.vedant.admin.feature.orders.detail.OrderDetailScreen
 import com.vedant.admin.feature.orders.list.OrdersListScreen
 import com.vedant.admin.feature.slots.SlotsScreen
+import com.vedant.admin.feature.settings.appearance.AppearanceScreen
 import com.vedant.admin.feature.settings.profile.ProfileScreen
 import com.vedant.admin.feature.settings.store.StoreSettingsScreen
 import com.vedant.admin.feature.support.SupportScreen
@@ -251,6 +252,14 @@ fun VedantNavHost(
 
         composable(Routes.PROFILE) {
             ProfileScreen(
+                factory = factory,
+                onBack = { navController.popBackStack() },
+                onOpenAppearance = { navController.navigate(Routes.APPEARANCE) },
+            )
+        }
+
+        composable(Routes.APPEARANCE) {
+            AppearanceScreen(
                 factory = factory,
                 onBack = { navController.popBackStack() },
             )

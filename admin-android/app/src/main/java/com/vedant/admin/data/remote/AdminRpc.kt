@@ -1,5 +1,6 @@
 package com.vedant.admin.data.remote
 
+import com.vedant.admin.data.remote.dto.DeliveryIssueInsertDto
 import com.vedant.admin.data.remote.dto.DeliveryOrderDto
 import com.vedant.admin.data.remote.dto.SlotLoadDto
 import io.github.jan.supabase.SupabaseClient
@@ -87,6 +88,25 @@ interface AdminRpc {
      */
     suspend fun setOrderAcceptance(accepting: Boolean, reason: String?)
 
+    /**
+     * Reports a delivery problem on [orderId] — the courier's REPORT ISSUE
+     * action (§25, migration `20261016_016_delivery_issues.sql`).
+     *
+     * This is a plain table insert, not an RPC: authorization lives in the
+     * table's RLS. A DELIVERY user may only insert for orders assigned to
+     * them; OWNER/ADMIN for any order; every other role (and anon/customers)
+     * is refused with `42501`. The actor is taken from the session by the
+     * server (`reported_by default auth.uid()`) — this client cannot forge it.
+     *
+     * [type] is a [com.vedant.admin.domain.model.DeliveryIssueType.wire] value
+     * and [reason] is required by both the client-side validation and a server
+     * CHECK, so a report is never persisted without specifics. The log is
+     * append-only: there is no update or retract path, by design.
+     *
+     * Throws on refusal (network error, or `42501` when the row is not the
+     * caller's assignment) — the caller surfaces it, never assumes success.
+     */
+    suspend fun reportDeliveryIssue(orderId: String, type: String, reason: String)
 
 }
 
@@ -177,7 +197,15 @@ class SupabaseAdminRpc(private val client: SupabaseClient) : AdminRpc {
         )
     }
 
+    override suspend fun reportDeliveryIssue(orderId: String, type: String, reason: String) {
+        client.postgrest.from(TABLE_DELIVERY_ISSUES)
+            .insert(DeliveryIssueInsertDto(orderId = orderId, issueType = type, reason = reason))
+    }
+
 }
+
+/** The append-only delivery escalation log (§25). */
+private const val TABLE_DELIVERY_ISSUES = "delivery_issues"
 
 
 /** Minimal projection of `store_settings` for the acceptance read. */

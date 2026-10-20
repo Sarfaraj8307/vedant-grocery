@@ -1,6 +1,7 @@
 package com.vedant.admin.feature.settings.profile
 
 import com.vedant.admin.core.error.AppError
+import com.vedant.admin.domain.model.AppearanceMode
 import com.vedant.admin.domain.model.OperatorProfile
 import com.vedant.admin.ui.components.ContentPhase
 
@@ -18,6 +19,8 @@ data class ProfileUiState(
     val profile: OperatorProfile? = null,
     val isSigningOut: Boolean = false,
     val signOutError: AppError? = null,
+    /** The persisted appearance choice, shown on the device settings entry (§8). */
+    val appearanceMode: AppearanceMode = AppearanceMode.DEFAULT,
 ) {
 
     val sessionExpired: Boolean get() = loadError == AppError.SessionExpired

@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +33,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vedant.admin.core.error.ErrorCopy
+import com.vedant.admin.domain.model.AppearanceMode
 import com.vedant.admin.domain.model.OperatorProfile
 import com.vedant.admin.ui.components.BadgeTone
 import com.vedant.admin.ui.components.ContentPhase
@@ -58,6 +62,7 @@ fun ProfileScreen(
     factory: ViewModelProvider.Factory,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenAppearance: () -> Unit = {},
 ) {
     val viewModel: ProfileViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,8 +95,10 @@ fun ProfileScreen(
                     profile = profile,
                     isSigningOut = state.isSigningOut,
                     signOutError = state.signOutError?.let(ErrorCopy::of),
+                    appearanceMode = state.appearanceMode,
                     onSignOut = viewModel::signOut,
                     onReload = viewModel::reload,
+                    onOpenAppearance = onOpenAppearance,
                 )
             }
         }
@@ -103,8 +110,10 @@ private fun ProfileBody(
     profile: OperatorProfile,
     isSigningOut: Boolean,
     signOutError: String?,
+    appearanceMode: AppearanceMode,
     onSignOut: () -> Unit,
     onReload: () -> Unit,
+    onOpenAppearance: () -> Unit,
 ) {
     val spacing = VedantTheme.spacing
 
@@ -116,6 +125,13 @@ private fun ProfileBody(
             .padding(spacing.screen),
     ) {
         IdentityHeader(profile = profile)
+
+        SectionCard(title = "Device") {
+            AppearanceEntry(
+                current = appearanceMode.label,
+                onClick = onOpenAppearance,
+            )
+        }
 
         SectionCard(title = "Access") {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -167,9 +183,61 @@ private fun ProfileBody(
     }
 }
 
+/**
+ * The settings entry that opens the appearance screen (§8).
+ *
+ * The current choice is the row's value — not just a static label — so the
+ * entry is useful even before it is tapped.
+ */
 @Composable
-private fun IdentityHeader(profile: OperatorProfile) {
+private fun AppearanceEntry(
+    current: String,
+    onClick: () -> Unit,
+) {
     val spacing = VedantTheme.spacing
+    val sizing = VedantTheme.sizing
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(VedantTheme.radius.md),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.SettingsBrightness,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(sizing.iconMd),
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = spacing.md),
+            ) {
+                Text(
+                    text = "Appearance",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = current,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun IdentityHeader(profile: OperatorProfile) {    val spacing = VedantTheme.spacing
     val sizing = VedantTheme.sizing
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,

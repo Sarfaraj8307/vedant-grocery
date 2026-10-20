@@ -88,6 +88,9 @@ object Routes {
     /** The signed-in operator's identity and server-resolved role. */
     const val PROFILE = "settings/profile"
 
+    /** The device-side System/Light/Dark choice (§8). */
+    const val APPEARANCE = "settings/appearance"
+
     /** Navigate to the list, optionally pre-filtered by [status]. */
     fun orders(status: OrderStatus? = null): String =
         if (status == null) ORDERS else "$ORDERS?$ARG_STATUS=${status.name}"

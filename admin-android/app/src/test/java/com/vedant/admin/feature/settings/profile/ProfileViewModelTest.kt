@@ -2,6 +2,7 @@ package com.vedant.admin.feature.settings.profile
 
 import com.vedant.admin.core.error.AppError
 import com.vedant.admin.core.result.Outcome
+import com.vedant.admin.testing.FakeAppearanceRepository
 import com.vedant.admin.testing.FakeAuthRepository
 import com.vedant.admin.testing.FakeProfileRepository
 import com.vedant.admin.testing.MainDispatcherRule
@@ -30,8 +31,9 @@ class ProfileViewModelTest {
 
     private val profiles = FakeProfileRepository()
     private val auth = FakeAuthRepository()
+    private val appearance = FakeAppearanceRepository()
 
-    private fun viewModel() = ProfileViewModel(profiles, auth)
+    private fun viewModel() = ProfileViewModel(profiles, auth, appearance)
 
     @Test
     fun `start shows the server-resolved administrator role`() =

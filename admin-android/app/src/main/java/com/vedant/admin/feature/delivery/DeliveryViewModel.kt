@@ -3,10 +3,13 @@ package com.vedant.admin.feature.delivery
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vedant.admin.core.error.AppError
+import com.vedant.admin.core.error.ErrorCopy
 import com.vedant.admin.core.error.ErrorMapper
 import com.vedant.admin.core.money.Money
 import com.vedant.admin.data.remote.AdminRpc
 import com.vedant.admin.data.remote.dto.DeliveryOrderDto
+import com.vedant.admin.domain.model.DeliveryIssueReport
+import com.vedant.admin.domain.model.DeliveryIssueType
 import com.vedant.admin.domain.model.DeliveryOrder
 import com.vedant.admin.domain.model.OrderStatus
 import com.vedant.admin.ui.components.ContentPhase
@@ -26,6 +29,18 @@ data class DeliveryUiState(
     val busyOrderId: String? = null,
     /** A one-shot message for the operator (e.g. a refused transition). */
     val actionMessage: String? = null,
+
+    // --- Report issue (§25) ---------------------------------------------------
+    /** The order the issue dialog is open for; `null` means the dialog is closed. */
+    val issueOrderId: String? = null,
+    /** The draft issue type in the open dialog. */
+    val issueType: DeliveryIssueType = DeliveryIssueType.DEFAULT,
+    /** The draft reason in the open dialog. */
+    val issueReason: String = "",
+    /** The inline validation/refusal copy for the open dialog. */
+    val issueError: String? = null,
+    /** True while the report is being written, so the dialog locks. */
+    val issueBusy: Boolean = false,
 )
 
 /**
@@ -107,7 +122,98 @@ class DeliveryViewModel(private val rpc: AdminRpc) : ViewModel() {
                 _uiState.update {
                     it.copy(
                         busyOrderId = null,
-                        actionMessage = com.vedant.admin.core.error.ErrorCopy.of(error),
+                        actionMessage = ErrorCopy.of(error),
+                    )
+                }
+            }
+        }
+    }
+
+    // --- Report issue (§25) ---------------------------------------------------
+
+    /** Opens the issue dialog for [orderId] with a fresh draft. */
+    fun openIssueReport(orderId: String) {
+        _uiState.update {
+            if (it.issueBusy) {
+                it // a submit is in flight; the dialog already owns the screen
+            } else {
+                it.copy(
+                    issueOrderId = orderId,
+                    issueType = DeliveryIssueType.DEFAULT,
+                    issueReason = "",
+                    issueError = null,
+                )
+            }
+        }
+    }
+
+    /** Closes the dialog and drops the draft. Ignored while a submit is in flight. */
+    fun dismissIssueReport() {
+        _uiState.update {
+            if (it.issueBusy) {
+                it
+            } else {
+                it.copy(
+                    issueOrderId = null,
+                    issueReason = "",
+                    issueError = null,
+                )
+            }
+        }
+    }
+
+    /** Updates the dialog's selected type. */
+    fun onIssueTypeSelected(type: DeliveryIssueType) {
+        _uiState.update { if (it.issueBusy) it else it.copy(issueType = type, issueError = null) }
+    }
+
+    /** Updates the dialog's reason text. */
+    fun onIssueReasonChange(reason: String) {
+        _uiState.update { if (it.issueBusy) it else it.copy(issueReason = reason, issueError = null) }
+    }
+
+    /**
+     * Validates the draft and writes it to `delivery_issues`.
+     *
+     * Validation first: a blank reason never leaves the device, so the
+     * operator gets an inline explanation instead of a server round-trip that
+     * would fail anyway. On success the dialog closes and the queue's banner
+     * confirms the report — the row is served to OWNER/ADMIN by RLS. On failure
+     * the dialog stays open with the reason, because "reported" is exactly the
+     * kind of success that must never be faked.
+     */
+    fun submitIssueReport() {
+        val current = _uiState.value
+        val orderId = current.issueOrderId ?: return
+        if (current.issueBusy) return
+
+        val reason = DeliveryIssueReport.validateReason(current.issueReason)
+        if (reason == null) {
+            _uiState.update {
+                it.copy(issueError = "Add a short reason so the store team knows what happened.")
+            }
+            return
+        }
+
+        _uiState.update { it.copy(issueBusy = true, issueError = null) }
+        viewModelScope.launch {
+            runCatching {
+                rpc.reportDeliveryIssue(orderId = orderId, type = current.issueType.wire, reason = reason)
+            }.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        issueBusy = false,
+                        issueOrderId = null,
+                        issueReason = "",
+                        issueError = null,
+                        actionMessage = "Issue reported — the store team can see it on this order.",
+                    )
+                }
+            }.onFailure { t ->
+                _uiState.update {
+                    it.copy(
+                        issueBusy = false,
+                        issueError = ErrorCopy.of(ErrorMapper.map(t)),
                     )
                 }
             }

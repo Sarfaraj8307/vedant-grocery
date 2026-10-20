@@ -5,8 +5,10 @@ import com.vedant.admin.core.network.AndroidConnectivityObserver
 import com.vedant.admin.core.network.ConnectivityObserver
 import com.vedant.admin.core.network.ConnectionMonitor
 import com.vedant.admin.core.result.Outcome
+import com.vedant.admin.data.local.AppearancePreferences
 import com.vedant.admin.data.local.CacheStore
 import com.vedant.admin.data.local.ReadRetryScheduler
+import com.vedant.admin.data.local.SettingsAppearancePreferences
 import com.vedant.admin.data.local.WorkManagerReadRetryScheduler
 import com.vedant.admin.data.local.createCacheStore
 import com.vedant.admin.data.remote.AdminRpc
@@ -25,6 +27,7 @@ import com.vedant.admin.data.remote.SupabaseSettingsRemoteSource
 import com.vedant.admin.data.remote.SupabaseSlotRemoteSource
 import com.vedant.admin.data.remote.SupabaseStorageDataSource
 import com.vedant.admin.data.repository.AuthRepositoryImpl
+import com.vedant.admin.data.repository.AppearanceRepositoryImpl
 import com.vedant.admin.data.repository.CategoryRepositoryImpl
 import com.vedant.admin.data.repository.ComplaintRepositoryImpl
 import com.vedant.admin.data.repository.OfferRepositoryImpl
@@ -38,6 +41,7 @@ import com.vedant.admin.data.session.SessionStore
 import com.vedant.admin.data.session.SupabaseSessionStore
 import com.vedant.admin.domain.model.OrderFilter
 import com.vedant.admin.domain.model.ProductQuery
+import com.vedant.admin.domain.repository.AppearanceRepository
 import com.vedant.admin.domain.repository.AuthRepository
 import com.vedant.admin.domain.repository.CategoryRepository
 import com.vedant.admin.domain.repository.ComplaintRepository
@@ -52,6 +56,7 @@ import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import com.russhwolf.settings.Settings
 
 /**
  * Hand-rolled dependency container — **no Hilt, no KSP** (explicit brief +
@@ -162,6 +167,19 @@ class AppContainer(val app: Application) {
 
     /** JSON snapshots of the last-good reads (DataStore — deliberately not Room). */
     val cacheStore: CacheStore by lazy { app.createCacheStore() }
+
+    /**
+     * The persisted appearance choice (§8). Uses the same
+     * `multiplatform-settings` mechanism as the session — no new dependency.
+     */
+    val appearancePreferences: AppearancePreferences by lazy {
+        SettingsAppearancePreferences(Settings())
+    }
+
+    /** The System/Light/Dark choice, seeded synchronously for the first frame. */
+    val appearanceRepository: AppearanceRepository by lazy {
+        AppearanceRepositoryImpl(appearancePreferences)
+    }
 
     /** Whether the device currently has a network — drives the offline banner. */
     val connectivity: ConnectivityObserver by lazy { AndroidConnectivityObserver(app, appScope) }
