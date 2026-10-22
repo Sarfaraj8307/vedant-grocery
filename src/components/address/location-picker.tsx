@@ -78,6 +78,69 @@ function osmEmbedUrl(lat: number, lng: number): string {
   return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&marker=${lat},${lng}`;
 }
 
+/**
+ * Get the *best* position the device can produce, not merely the first one.
+ *
+ * WHY THIS EXISTS — a real accuracy bug.
+ * `getCurrentPosition` resolves with whatever fix is ready **first**. On a
+ * laptop, or a phone indoors, that first fix is very often a coarse
+ * network/Wi-Fi estimate accurate to hundreds of metres or kilometres — even
+ * though `enableHighAccuracy: true` was requested. That is exactly how a
+ * "use my current location" pin ends up in the wrong locality while the code
+ * looks correct.
+ *
+ * `watchPosition` streams successive fixes as the device refines its estimate.
+ * We keep the best accuracy seen and resolve as soon as it is good enough, or
+ * when the refinement budget expires — whichever happens first. A later error
+ * never discards a fix we already hold.
+ */
+const TARGET_ACCURACY_M = 35;
+const REFINE_BUDGET_MS = 12_000;
+
+function getBestPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    let best: GeolocationPosition | null = null;
+    let settled = false;
+    let watchId = -1;
+    // A holder object rather than `let timer`: `finish` closes over it before the
+    // timer is created, and a reassigned `let` trips prefer-const.
+    const box: { timer?: ReturnType<typeof setTimeout> } = {};
+
+    const finish = (run: () => void) => {
+      if (settled) return;
+      settled = true;
+      if (watchId >= 0) navigator.geolocation.clearWatch(watchId);
+      if (box.timer) clearTimeout(box.timer);
+      run();
+    };
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        if (!best || position.coords.accuracy < best.coords.accuracy) best = position;
+        if (position.coords.accuracy <= TARGET_ACCURACY_M) {
+          const fixed = position;
+          finish(() => resolve(fixed));
+        }
+      },
+      (error) => {
+        const held = best;
+        if (held) finish(() => resolve(held));
+        else finish(() => reject(error));
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
+
+    box.timer = setTimeout(() => {
+      const held = best;
+      if (held) finish(() => resolve(held));
+      else
+        finish(() =>
+          reject(Object.assign(new Error("Location timed out"), { code: 3 })),
+        );
+    }, REFINE_BUDGET_MS);
+  });
+}
+
 export function LocationPicker({
   initialCoords = null,
   onAddressFound,
@@ -162,7 +225,7 @@ export function LocationPicker({
     }
     setState({ kind: "locating" });
 
-    navigator.geolocation.getCurrentPosition(
+    void getBestPosition().then(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
 
@@ -173,7 +236,7 @@ export function LocationPicker({
         }
         void geocode({ lat: latitude, lng: longitude, accuracy });
       },
-      async (error) => {
+    ).catch(async (error: GeolocationPositionError) => {
         if (error.code === error.PERMISSION_DENIED) {
           // `denied` means the browser will not prompt again and the customer
           // must re-enable the site permission; anything else is dismissible.
@@ -189,9 +252,7 @@ export function LocationPicker({
           return;
         }
         setState({ kind: "unavailable" });
-      },
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
-    );
+    });
   }
 
   const coords =

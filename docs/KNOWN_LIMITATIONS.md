@@ -47,3 +47,26 @@ Genuine unresolved items. Nothing here is softened into "partial" when it is a g
 - **No customer Android app.** Web is the customer surface, per the frozen architecture.
 - **No fake wallet, no fake GPS, no fake realtime.** Where something is unfinished it is listed
   above rather than stubbed to look complete.
+
+## Auth email links on the free tier
+
+Email confirmation links use Supabase's **PKCE** flow. The PKCE verifier is a cookie bound to the
+browser that started the signup, so a link opened on a **different device or browser** cannot
+complete the automatic sign-in.
+
+**The account is still confirmed** — Supabase's verify endpoint sets `email_confirmed_at` before
+redirecting. Only the auto-sign-in fails, so the customer simply signs in normally. The callback
+now says exactly that instead of echoing `PKCE code verifier not found in storage`.
+
+The proper fixes, in order of preference:
+
+1. **Configure custom SMTP** (free tier allows it). That unlocks template editing, and the
+   template can then use `{{ .TokenHash }}` → `/auth/callback?token_hash=…&type=signup`, which the
+   callback already handles via `verifyOtp` and which needs **no verifier**, so it works on any
+   device. This is the real solution.
+2. Upgrade the plan for template editing.
+3. Accept the current behaviour: confirmed, then sign in.
+
+Blocked today: `PATCH /v1/projects/{ref}/config/auth` returns
+`400 — "Email template modification is not available for free tier projects using the default
+email provider."` So option 1 requires SMTP credentials that only the owner can supply.

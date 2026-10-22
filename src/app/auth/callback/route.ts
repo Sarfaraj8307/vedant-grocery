@@ -17,6 +17,37 @@ import { absoluteUrl } from "@/config/site";
  * `next` is sanitised to a same-origin relative path: an attacker-controlled
  * `?next=` on an auth callback is the classic open-redirect vector.
  */
+/**
+ * Turn a Supabase auth failure into copy a customer can act on.
+ *
+ * WHY: these messages were being shown verbatim. A customer who clicked a
+ * confirmation link on their phone after signing up on a laptop saw
+ * "PKCE code verifier not found in storage…" — accurate, and useless.
+ *
+ * The important fact in that case is that **the account is already confirmed**:
+ * Supabase's `/auth/v1/verify` endpoint validates the token and sets
+ * `email_confirmed_at` before it redirects here. Only the automatic sign-in
+ * fails, because a PKCE verifier is bound to the browser that started the flow.
+ * So the honest message tells them to sign in, not that something broke.
+ *
+ * Anything unrecognised is passed through unchanged — guessing at an unknown
+ * failure would hide a real one.
+ */
+function friendlyAuthError(raw: string): string {
+  const m = raw.toLowerCase();
+
+  if (m.includes("code verifier") || m.includes("pkce")) {
+    return "Your email is confirmed. This link was opened in a different browser or device, so we could not sign you in automatically — please sign in with your email and password.";
+  }
+  if (m.includes("expired") || m.includes("otp_expired")) {
+    return "That link has expired or has already been used. Request a fresh one from the sign-in page.";
+  }
+  if (m.includes("invalid") && (m.includes("token") || m.includes("link"))) {
+    return "That link is no longer valid. Request a fresh one from the sign-in page.";
+  }
+  return raw;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -28,7 +59,7 @@ export async function GET(request: NextRequest) {
   // A provider-side failure is reported back to the customer, not swallowed.
   if (errorDescription) {
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(errorDescription)}`,
+      `${origin}/login?error=${encodeURIComponent(friendlyAuthError(errorDescription))}`,
     );
   }
 
@@ -39,7 +70,7 @@ export async function GET(request: NextRequest) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (error) {
         return NextResponse.redirect(
-          `${origin}/login?error=${encodeURIComponent(error.message)}`,
+          `${origin}/login?error=${encodeURIComponent(friendlyAuthError(error.message))}`,
         );
       }
     } else if (tokenHash && type) {
@@ -49,11 +80,20 @@ export async function GET(request: NextRequest) {
       });
       if (error) {
         return NextResponse.redirect(
-          `${origin}/login?error=${encodeURIComponent(error.message)}`,
+          `${origin}/login?error=${encodeURIComponent(friendlyAuthError(error.message))}`,
         );
       }
     } else {
-      return NextResponse.redirect(`${origin}/login`);
+      // Neither a PKCE `code` nor a `token_hash` reached us. The one legitimate
+      // way that happens is the implicit flow, which carries the session in the
+      // URL *fragment* — fragments are never sent to the server, so this route
+      // cannot see it. Tell the customer what to do rather than showing a bare
+      // form with no explanation.
+      return NextResponse.redirect(
+        `${origin}/login?error=${encodeURIComponent(
+          "If you just confirmed your email, it worked — please sign in. We could not sign you in automatically from that link.",
+        )}`,
+      );
     }
   } catch {
     return NextResponse.redirect(
