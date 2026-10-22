@@ -28,6 +28,47 @@ export async function listAddresses(): Promise<AddressRow[]> {
   return (data ?? []) as AddressRow[];
 }
 
+/**
+ * Turn an address write failure into copy the customer can act on.
+ *
+ * WHY: this used to collapse every failure into "We could not save that address.
+ * Please try again." A real 42501 RLS rejection — which retrying can never fix —
+ * was presented as if it were transient. That is how a permanently broken
+ * insert looked like a flaky one for so long.
+ *
+ * The raw error is logged so the next occurrence is diagnosable instead of
+ * invisible, while the customer sees something useful.
+ */
+export function describeAddressError(error: unknown): string {
+  const code = (error as { code?: string })?.code ?? "";
+  const message = ((error as { message?: string })?.message ?? "").toLowerCase();
+
+  // Always leave a trail — a swallowed error is how this bug hid.
+  if (typeof console !== "undefined") {
+    console.error("[address-service] save failed", error);
+  }
+
+  if (code === "42501" || message.includes("row-level security")) {
+    return "Your session has expired, so we could not save this address. Please sign in again and retry.";
+  }
+  if (message.includes("pincode") || message.includes("postal_code")) {
+    return "Enter a valid 6-digit pincode.";
+  }
+  if (message.includes("phone")) {
+    return "Enter a valid 10–15 digit phone number.";
+  }
+  if (code === "23502" || message.includes("null value")) {
+    return "Something required is missing. Check the address and phone number.";
+  }
+  if (code === "23514") {
+    return "One of the details is not accepted. Check the pincode and phone number.";
+  }
+  if (code === "PGRST301" || message.includes("jwt")) {
+    return "Your session has expired. Please sign in again.";
+  }
+  return "We could not save that address. Please try again.";
+}
+
 export async function createAddress(
   input: AddressInput,
   options: { makeDefault?: boolean } = {},
@@ -61,6 +102,13 @@ export async function createAddress(
   const { data, error } = await supabase
     .from("addresses")
     .insert({
+      // Sent explicitly as well as defaulted in the database (migration 020).
+      // The column is NOT NULL with no default historically, and the RLS policy
+      // is `auth.uid() = user_id`, so omitting it produced a 42501 on every
+      // insert. Relying on the DB default alone would work, but stating it here
+      // means a future schema change cannot silently break address creation
+      // again — and the intent is visible at the call site.
+      user_id: user.id,
       label: input.label,
       line1,
       line2: input.landmark ?? "",
@@ -81,15 +129,7 @@ export async function createAddress(
     .single();
 
   if (error || !data) {
-    // Surface the DB hint when the check fails (invalid pincode/phone/etc.)
-    const hint =
-      (error as { message?: string })?.message ?? "We could not save that address. Please try again.";
-    const friendly = hint.toLowerCase().includes("pincode")
-      ? "Enter a valid 6-digit pincode."
-      : hint.toLowerCase().includes("phone")
-        ? "Enter a valid 10–15 digit phone number."
-        : "We could not save that address. Please try again.";
-    return { ok: false, error: friendly };
+    return { ok: false, error: describeAddressError(error) };
   }
   return { ok: true, data: data as AddressRow };
 }
@@ -128,7 +168,9 @@ export async function updateAddress(
     .single();
 
   if (error || !data) {
-    return { ok: false, error: "We could not update that address. Please try again." };
+    // Same reasoning as createAddress: a 42501 here means the session expired or
+    // the row is not yours, and "try again" would send the customer in circles.
+    return { ok: false, error: describeAddressError(error) };
   }
   return { ok: true, data: data as AddressRow };
 }
