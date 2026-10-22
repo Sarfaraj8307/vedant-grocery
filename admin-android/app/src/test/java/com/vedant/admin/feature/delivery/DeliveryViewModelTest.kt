@@ -2,6 +2,8 @@ package com.vedant.admin.feature.delivery
 
 import com.vedant.admin.data.remote.AdminRpc
 import com.vedant.admin.data.remote.dto.DeliveryOrderDto
+import com.vedant.admin.data.remote.dto.DashboardCountsDto
+import com.vedant.admin.data.remote.dto.SalesTodayDto
 import com.vedant.admin.data.remote.dto.SlotLoadDto
 import com.vedant.admin.domain.model.DeliveryIssueType
 import com.vedant.admin.testing.MainDispatcherRule
@@ -169,6 +171,10 @@ class DeliveryViewModelTest {
         override suspend fun restoreOrderItem(itemId: String) = Unit
 
         override suspend fun ensureDeliverySlots(from: String, days: Int) = Unit
+
+        override suspend fun dashboardCounts(): DashboardCountsDto? = null
+
+        override suspend fun salesToday(): SalesTodayDto? = null
 
         override suspend fun adminSlotLoad(from: String, days: Int): List<SlotLoadDto> = emptyList()
 

@@ -6,6 +6,8 @@ import com.vedant.admin.core.result.Outcome
 import com.vedant.admin.data.remote.AdminRpc
 import com.vedant.admin.data.remote.OrderRemoteSource
 import com.vedant.admin.data.remote.dto.OrderDto
+import com.vedant.admin.data.remote.dto.DashboardCountsDto
+import com.vedant.admin.data.remote.dto.SalesTodayDto
 import com.vedant.admin.data.remote.dto.OrderStatusHistoryDto
 import com.vedant.admin.data.remote.dto.DeliveryOrderDto
 import com.vedant.admin.data.remote.dto.SlotLoadDto
@@ -234,6 +236,10 @@ class OrderRepositoryImplTest {
         override suspend fun setOrderAcceptance(accepting: Boolean, reason: String?) = Unit
 
         override suspend fun reportDeliveryIssue(orderId: String, type: String, reason: String) = Unit
+
+        override suspend fun dashboardCounts(): DashboardCountsDto? = null
+
+        override suspend fun salesToday(): SalesTodayDto? = null
 
         override suspend fun adminSlotLoad(from: String, days: Int): List<SlotLoadDto> {
             failure?.let { throw it }

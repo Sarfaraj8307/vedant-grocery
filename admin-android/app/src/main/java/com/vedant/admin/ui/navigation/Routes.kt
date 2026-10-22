@@ -45,6 +45,9 @@ object Routes {
     /** The courier's assigned-deliveries queue (§21). */
     const val DELIVERY = "delivery"
 
+    /** Reporting / analytics (brief §28). */
+    const val ANALYTICS = "analytics"
+
     /** Support / complaints list. */
     const val SUPPORT = "support"
 

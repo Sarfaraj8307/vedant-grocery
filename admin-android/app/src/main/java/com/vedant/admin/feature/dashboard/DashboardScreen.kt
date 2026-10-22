@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Storefront
@@ -106,6 +107,7 @@ fun DashboardScreen(
     onOpenCatalogue: () -> Unit,
     onOpenSlots: () -> Unit,
     onOpenSupport: () -> Unit,
+    onOpenAnalytics: () -> Unit,
     onOpenStoreSettings: () -> Unit,
     onOpenProfile: () -> Unit,
     onSignOut: () -> Unit,
@@ -154,6 +156,13 @@ fun DashboardScreen(
             icon = Icons.Filled.SupportAgent,
             onClick = onOpenSupport,
             accent = Berry500,
+        ),
+        DashboardTile(
+            title = "Reporting",
+            subtitle = "Today's numbers",
+            icon = Icons.Filled.Analytics,
+            onClick = onOpenAnalytics,
+            accent = Leaf500,
         ),
         DashboardTile(
             title = "Store settings",

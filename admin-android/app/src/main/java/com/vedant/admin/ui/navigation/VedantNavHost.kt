@@ -101,6 +101,7 @@ fun VedantNavHost(
                 onOpenCatalogue = { navController.navigate(Routes.CATALOGUE) },
                 onOpenSlots = { navController.navigate(Routes.SLOTS) },
                 onOpenSupport = { navController.navigate(Routes.SUPPORT) },
+                onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) },
                 onOpenStoreSettings = { navController.navigate(Routes.STORE_SETTINGS) },
                 onOpenProfile = { navController.navigate(Routes.PROFILE) },
                 onSignOut = sessionViewModel::signOut,

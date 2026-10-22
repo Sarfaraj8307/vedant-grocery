@@ -1,7 +1,9 @@
 package com.vedant.admin.data.remote
 
 import com.vedant.admin.data.remote.dto.DeliveryIssueInsertDto
+import com.vedant.admin.data.remote.dto.DashboardCountsDto
 import com.vedant.admin.data.remote.dto.DeliveryOrderDto
+import com.vedant.admin.data.remote.dto.SalesTodayDto
 import com.vedant.admin.data.remote.dto.SlotLoadDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
@@ -78,6 +80,17 @@ interface AdminRpc {
      * of assuming "open" and letting an operator believe orders are live.
      */
     suspend fun isAcceptingOrders(): Boolean?
+
+    /**
+     * `admin_dashboard_counts()` — today's operational headline numbers.
+     *
+     * Returns a single row delivered as a one-element list; an empty list is
+     * "nothing happened today", not an error.
+     */
+    suspend fun dashboardCounts(): DashboardCountsDto?
+
+    /** `admin_sales_today()` — gross/discounts/adjustments/refunds/net/AOV. */
+    suspend fun salesToday(): SalesTodayDto?
 
     /**
      * `admin_set_order_acceptance(p_accepting, p_reason)` — stop or resume trade.
@@ -177,6 +190,12 @@ class SupabaseAdminRpc(private val client: SupabaseClient) : AdminRpc {
             },
         ).decodeList()
 
+
+    override suspend fun dashboardCounts(): DashboardCountsDto? =
+        client.postgrest.rpc("admin_dashboard_counts").decodeList<DashboardCountsDto>().firstOrNull()
+
+    override suspend fun salesToday(): SalesTodayDto? =
+        client.postgrest.rpc("admin_sales_today").decodeList<SalesTodayDto>().firstOrNull()
 
     override suspend fun isAcceptingOrders(): Boolean? = runCatching {
         client.postgrest.from("store_settings")

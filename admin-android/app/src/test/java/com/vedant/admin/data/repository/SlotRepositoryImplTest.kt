@@ -5,6 +5,8 @@ import com.vedant.admin.core.result.Outcome
 import com.vedant.admin.data.remote.AdminRpc
 import com.vedant.admin.data.remote.SlotRemoteSource
 import com.vedant.admin.data.remote.dto.DeliverySlotDto
+import com.vedant.admin.data.remote.dto.DashboardCountsDto
+import com.vedant.admin.data.remote.dto.SalesTodayDto
 import com.vedant.admin.data.remote.dto.DeliveryOrderDto
 import com.vedant.admin.data.remote.dto.SlotLoadDto
 import com.vedant.admin.domain.model.DeliverySlotDraft
@@ -233,6 +235,10 @@ class SlotRepositoryImplTest {
         override suspend fun setOrderAcceptance(accepting: Boolean, reason: String?) = Unit
 
         override suspend fun reportDeliveryIssue(orderId: String, type: String, reason: String) = Unit
+
+        override suspend fun dashboardCounts(): DashboardCountsDto? = null
+
+        override suspend fun salesToday(): SalesTodayDto? = null
 
         override suspend fun adminSlotLoad(from: String, days: Int): List<SlotLoadDto> {
             calls += "load:$from:$days"
