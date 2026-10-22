@@ -108,6 +108,24 @@ export default async function OrderDetailPage({
   const hasAdjustment = order.adjustment_amount < 0 || rejected.length > 0;
   const meta = ORDER_STATUS_META[order.status];
 
+  /**
+   * Who cancelled this order, and why.
+   *
+   * `order_status_history.changed_by` is the only record of the actor: it is the
+   * customer's own id when they cancelled from the site, and a staff id when the
+   * store did it. Without this the customer just saw a grey "Cancelled" badge
+   * with no explanation, which reads as if something went wrong on their side.
+   */
+  const cancellation = (() => {
+    if (order.status !== "CANCELLED") return null;
+    const event = history.find((entry) => entry.new_status === "CANCELLED");
+    return {
+      byCustomer: event ? event.changed_by === order.user_id : false,
+      reason: order.cancel_reason ?? event?.reason ?? null,
+      at: order.cancelled_at ?? event?.created_at ?? null,
+    };
+  })();
+
   return (
     <div className="shell flex flex-col gap-5 py-6 sm:py-8">
       <LiveOrderRefresh userId={user.id} />
@@ -157,6 +175,36 @@ export default async function OrderDetailPage({
 
         {order.status !== "CANCELLED" ? (
           <Tracker status={order.status} history={history} />
+        ) : cancellation ? (
+          <div
+            role="status"
+            className="mt-4 rounded-md border border-line bg-surface-muted px-3.5 py-3"
+          >
+            <p className="text-small font-medium text-ink">
+              {cancellation.byCustomer
+                ? "You cancelled this order"
+                : "This order was cancelled by the store"}
+            </p>
+            {cancellation.reason ? (
+              <p className="mt-0.5 text-small text-ink-muted">
+                Reason: {cancellation.reason}
+              </p>
+            ) : null}
+            {cancellation.at ? (
+              <p className="mt-0.5 text-caption text-ink-subtle">
+                {formatDateTime(cancellation.at)}
+              </p>
+            ) : null}
+            {!cancellation.byCustomer ? (
+              <p className="mt-1.5 text-small text-ink-muted">
+                If you were not expecting this,{" "}
+                <Link href="/contact" className="underline underline-offset-2">
+                  contact us
+                </Link>{" "}
+                and we will sort it out.
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </section>
 

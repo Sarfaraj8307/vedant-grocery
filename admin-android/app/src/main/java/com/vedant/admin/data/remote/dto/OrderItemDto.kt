@@ -33,3 +33,19 @@ data class OrderItemDto(
     @SerialName("rejection_reason") val rejectionReason: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
 )
+
+/**
+ * Minimal projection for "which order does this item belong to?".
+ *
+ * WHY THIS EXISTS: the lookup selects only `order_id`, but it used to decode into
+ * [OrderItemDto], whose `id` is a **required** field. kotlinx.serialization threw
+ * `MissingFieldException: id` on every call, so rejecting or restoring an item
+ * failed before the RPC was ever reached — the server was fine all along.
+ *
+ * Decoding a narrow select into a wide DTO is the underlying mistake; a DTO that
+ * declares exactly the columns being read cannot drift.
+ */
+@kotlinx.serialization.Serializable
+data class OrderIdRefDto(
+    @SerialName("order_id") val orderId: String? = null,
+)

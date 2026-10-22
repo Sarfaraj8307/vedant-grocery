@@ -160,6 +160,13 @@ export type OrderRow = {
    */
   placed_at: string;
   updated_at: string;
+  /**
+   * Set by `customer_cancel_order` (022) and by `admin_update_order_status` when
+   * a staff member cancels. `cancelled_at` is what the customer's cancellation
+   * banner shows, so it must stay in the select.
+   */
+  cancelled_at: string | null;
+  cancel_reason: string | null;
 };
 
 export type OrderItemRow = {

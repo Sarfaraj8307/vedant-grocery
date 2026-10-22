@@ -4,6 +4,7 @@ import com.vedant.admin.core.logging.AppLog
 import com.vedant.admin.core.time.AppClock
 import com.vedant.admin.data.remote.dto.OrderDto
 import com.vedant.admin.data.remote.dto.OrderItemDto
+import com.vedant.admin.data.remote.dto.OrderIdRefDto
 import com.vedant.admin.data.remote.dto.OrderStatusHistoryDto
 import com.vedant.admin.domain.model.OrderFilter
 import com.vedant.admin.domain.model.OrderStatus
@@ -102,7 +103,7 @@ class SupabaseOrderRemoteSource(private val client: SupabaseClient) : OrderRemot
                 filter { eq("id", itemId) }
                 limit(1)
             }
-            .decodeList<OrderItemDto>()
+            .decodeList<OrderIdRefDto>()
             .firstOrNull()
             ?.orderId
 
