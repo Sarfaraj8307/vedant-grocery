@@ -85,3 +85,57 @@ earlier commit — the app is stateless apart from Supabase.
 - No CI gate on deploy. `.github/workflows/ci.yml` exists but there is no remote, so it has never
   run. Deploys are manual and currently unverified by CI.
 - Preview deployments require Vercel authentication.
+
+## Supabase Auth URL configuration (a trap that will recur)
+
+Supabase sends confirmation / recovery emails using **its own** URL settings, not the app's. If
+`Site URL` is left at `http://localhost:3000` — the default — every link points at a machine that
+does not exist for the customer, and the app's `emailRedirectTo` is **silently overridden** unless
+the target is in the allowlist.
+
+This actually happened: a real signup produced
+`http://localhost:3000/?error=access_denied&error_code=otp_expired…`.
+
+### Correct settings
+
+Dashboard → Authentication → URL Configuration:
+
+| Field | Value |
+|---|---|
+| **Site URL** | `https://vedant-grocery.vercel.app` |
+| **Redirect URLs** | `https://vedant-grocery.vercel.app/**`, `https://vedant-grocery.vercel.app`, `http://localhost:3000/**` |
+
+The trailing `/**` matters — `emailRedirectTo` targets `/auth/callback`, and a bare
+`https://host` entry does not match a path.
+
+Programmatically:
+
+```bash
+curl -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
+  -H "Authorization: Bearer $PAT" -H "Content-Type: application/json" \
+  -d '{"site_url":"https://vedant-grocery.vercel.app",
+       "uri_allow_list":"https://vedant-grocery.vercel.app/**,https://vedant-grocery.vercel.app,http://localhost:3000/**"}'
+```
+
+**Verify the PATCH actually took.** It returns `200` even when a field is ignored; re-`GET` and
+read `site_url` / `uri_allow_list` back. A first read can be stale — check twice before believing
+it failed.
+
+### How to prove it works without reading an inbox
+
+```bash
+curl -X POST "https://$REF.supabase.co/auth/v1/admin/generate_link" \
+  -H "apikey: $SERVICE_ROLE" -H "Authorization: Bearer $SERVICE_ROLE" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"signup","email":"probe@example.com","password":"…",
+       "redirect_to":"https://vedant-grocery.vercel.app/auth/callback"}'
+```
+
+Read `redirect_to` from the response. It must come back as the `/auth/callback` URL — if Supabase
+has overridden it with the Site URL, the allowlist is still wrong. **Delete the probe user
+afterwards**; `generate_link` creates a real account.
+
+### If a link still says `otp_expired`
+
+That is separate from the URL bug: the token was already used, expired (default 24 h), or
+superseded by a newer signup for the same address. Signing up again issues a fresh one.
