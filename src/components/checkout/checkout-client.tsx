@@ -159,7 +159,11 @@ export function CheckoutClient({
       clear();
       // A fresh id for the next order this session.
       requestIdRef.current = newRequestId();
-      router.push(`/order/${result.orderId}?placed=1`);
+      // `/orders/{id}` — PLURAL. This was `/order/{id}`, which has no route, so
+      // every successful order landed on the 404 page ("we couldn't find that
+      // page") even though `place_order` had already committed the order. The
+      // customer saw a failure and the order existed — the worst combination.
+      router.push(`/orders/${result.orderId}?placed=1`);
     } catch {
       setError("We could not place your order. Please try again.");
       setPlacing(false);
