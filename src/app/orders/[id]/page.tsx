@@ -5,6 +5,7 @@ import { AlertCircle, ArrowLeft, HeadphonesIcon, Receipt } from "lucide-react";
 
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { ReorderButton } from "@/components/orders/reorder-button";
+import { CancelOrderPanel } from "@/components/orders/cancel-order-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/misc";
@@ -260,8 +261,11 @@ export default async function OrderDetailPage({
               </li>
             ))}
           </ul>
-          <div className="px-4 pb-4">
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
             <ReorderButton items={items} redirectToCart={false} className="mt-1" />
+            <div className="mt-1">
+              <CancelOrderPanel orderId={order.id} status={order.status} />
+            </div>
           </div>
         </div>
 
