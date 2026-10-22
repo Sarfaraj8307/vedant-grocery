@@ -53,3 +53,5 @@ next-env.d.ts
 # Kotlin/Gradle build noise
 .kotlin/
 *.hprof
+
+.vercel

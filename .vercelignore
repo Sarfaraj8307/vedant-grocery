@@ -1,0 +1,18 @@
+# Vercel must not upload anything the build does not need.
+# Without this the CLI archived 1.8 GB — node_modules plus a stale 2.2 GB .next-old.
+#
+# PATHS ARE ROOT-ANCHORED ON PURPOSE. A bare name like `supabase` is a gitignore
+# pattern that matches at ANY depth, so it also excluded `src/lib/supabase/` and
+# broke the build with "Can't resolve '@/lib/supabase/client'". Use a leading
+# slash for anything meant to be root-only.
+.vercel
+node_modules
+.next-old
+.next
+/admin-android
+/docs
+/tests
+/supabase
+/scripts
+*.tsbuildinfo
+.husky
