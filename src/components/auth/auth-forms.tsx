@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/menu";
 import { Field, Input } from "@/components/ui/input";
 import { OrDivider } from "@/components/auth/auth-shell";
+import { authInputClass, authSubmitClass } from "@/components/auth/auth-card";
+import { PasswordInput } from "@/components/auth/password-input";
 import {
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -24,6 +26,8 @@ import {
 } from "@/lib/validation";
 import {
   checkUsername,
+  isEmailUnconfirmed,
+  resendConfirmation,
   sendPasswordReset,
   signInWithGoogle,
   signInWithPassword,
@@ -126,14 +130,39 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
     setError,
   } = useForm<SignInInput>({ resolver: zodResolver(signInSchema) });
 
+  /** Set only when the provider rejected the sign-in for an unconfirmed address. */
+  const [unconfirmedEmail, setUnconfirmedEmail] = React.useState<string | null>(null);
+  const [resending, setResending] = React.useState(false);
+  const [resendNote, setResendNote] = React.useState<string | null>(null);
+
   async function onSubmit(values: SignInInput) {
+    setUnconfirmedEmail(null);
+    setResendNote(null);
+
     const result = await signInWithPassword(values);
     if (!result.ok) {
       setError("root", { message: result.error });
+      if (isEmailUnconfirmed(result.code, result.error)) {
+        setUnconfirmedEmail(values.email);
+      }
       return;
     }
     router.push(next);
     router.refresh();
+  }
+
+  async function resend() {
+    if (!unconfirmedEmail) return;
+    setResending(true);
+    setResendNote(null);
+
+    const result = await resendConfirmation(unconfirmedEmail);
+    setResending(false);
+    setResendNote(
+      result.ok
+        ? "Sent. Check your inbox — and the spam folder, just in case."
+        : result.error,
+    );
   }
 
   return (
@@ -145,8 +174,20 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
         </p>
       ) : null}
 
+      {/* Rendered only when the Supabase project actually has Google enabled
+          (probed server-side). A sign-in button that always errors would be a
+          fake control, which this project does not ship. */}
+      {googleEnabled ? (
+        <>
+          <GoogleButton next={next} label="Sign in with Google" />
+          <OrDivider />
+        </>
+      ) : null}
+
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        {errors.root ? (
+        {/* Suppressed when the dedicated unconfirmed panel below is shown —
+            two copies of the same message reads as a bug. */}
+        {errors.root && !unconfirmedEmail ? (
           <p
             role="alert"
             className="mb-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
@@ -162,7 +203,9 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
             inputMode="email"
             autoComplete="email"
             autoFocus
+            placeholder="you@example.com"
             invalid={Boolean(errors.email)}
+            className={authInputClass}
             {...register("email")}
           />
         </Field>
@@ -173,38 +216,69 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
           error={errors.password?.message}
           required
         >
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
+            placeholder="Your password"
             invalid={Boolean(errors.password)}
+            className={authInputClass}
             {...register("password")}
           />
         </Field>
 
-        <div className="mb-4 flex justify-end">
-          <Link
-            href="/forgot-password"
-            className="text-small text-leaf-700 underline-offset-2 hover:underline"
-          >
-            Forgot your password?
-          </Link>
-        </div>
-
-        <Button type="submit" block size="lg" loading={isSubmitting} loadingLabel="Signing in…">
+        <Button
+          type="submit"
+          block
+          size="lg"
+          className={authSubmitClass}
+          loading={isSubmitting}
+          loadingLabel="Signing in…"
+        >
           Sign in
         </Button>
       </form>
 
-      {/* Rendered only when the Supabase project actually has Google enabled
-          (probed server-side). A sign-in button that always errors would be a
-          fake control, which this project does not ship. */}
-      {googleEnabled ? (
-        <>
-          <OrDivider />
-          <GoogleButton next={next} label="Continue with Google" />
-        </>
+      {/*
+        The requirement: an unconfirmed customer must be told to confirm, not
+        left with a generic failure. Offering the resend here is the difference
+        between a dead end and a fix — the original email may have expired or
+        never arrived.
+      */}
+      {unconfirmedEmail ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-md border border-marigold-200 bg-marigold-50 px-3 py-3"
+        >
+          <p className="text-small font-medium text-ink">Please confirm your email first</p>
+          <p className="mt-1 text-small text-ink-muted">
+            We sent a confirmation link to{" "}
+            <span className="font-medium text-ink">{unconfirmedEmail}</span>. Open it
+            and you will be signed in automatically. If it has not arrived, we can
+            send another.
+          </p>
+          {resendNote ? (
+            <p className="mt-2 text-small text-ink-muted">{resendNote}</p>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2.5"
+            loading={resending}
+            loadingLabel="Sending…"
+            onClick={() => void resend()}
+          >
+            Resend confirmation email
+          </Button>
+        </div>
       ) : null}
+
+      <Link
+        href="/forgot-password"
+        className="mt-4 block text-center text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+      >
+        Request a New Password
+      </Link>
     </div>
   );
 }
@@ -332,10 +406,14 @@ export function SignUpForm({
 
   if (pendingConfirmation) {
     return (
-      <div className="rounded-lg border border-line bg-surface p-5 shadow-xs">
-        <h2 className="font-display text-h3 text-ink">
-          Check your inbox to confirm
-        </h2>
+      <div>
+        <span
+          aria-hidden="true"
+          className="mb-4 grid size-11 place-items-center rounded-full bg-success-bg text-success"
+        >
+          <Check className="size-5" />
+        </span>
+        <h2 className="font-display text-h3 text-ink">Check your inbox to confirm</h2>
         <p className="mt-2 text-body text-ink-muted">
           We have sent a confirmation link to your email address. Open it and you
           will be signed in automatically — then you can start shopping.
@@ -345,7 +423,7 @@ export function SignUpForm({
           <Link href="/login" className="text-leaf-700 underline underline-offset-2">
             try signing in
           </Link>{" "}
-          and we will send a new link.
+          and we will offer to send a new link.
         </p>
       </div>
     );
@@ -353,6 +431,13 @@ export function SignUpForm({
 
   return (
     <div>
+      {googleEnabled ? (
+        <>
+          <GoogleButton next={next} label="Sign up with Google" />
+          <OrDivider />
+        </>
+      ) : null}
+
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         {errors.root ? (
           <p
@@ -374,7 +459,9 @@ export function SignUpForm({
               id="firstName"
               autoComplete="given-name"
               autoFocus
+              placeholder="Asha"
               invalid={Boolean(errors.firstName)}
+              className={authInputClass}
               {...register("firstName")}
             />
           </Field>
@@ -382,7 +469,9 @@ export function SignUpForm({
             <Input
               id="lastName"
               autoComplete="family-name"
+              placeholder="Kulkarni"
               invalid={Boolean(errors.lastName)}
+              className={authInputClass}
               {...register("lastName")}
             />
           </Field>
@@ -394,7 +483,9 @@ export function SignUpForm({
             type="email"
             inputMode="email"
             autoComplete="email"
+            placeholder="you@example.com"
             invalid={Boolean(errors.email)}
+            className={authInputClass}
             {...register("email")}
           />
         </Field>
@@ -403,8 +494,9 @@ export function SignUpForm({
           label="Username"
           htmlFor="username"
           error={errors.username?.message}
-          hint="Used to identify you to the shop. Lowercase letters, numbers and underscores."
+          hint="Lowercase letters, numbers, underscores."
           required
+          className="mb-2"
         >
           <div className="relative">
             <Input
@@ -412,7 +504,9 @@ export function SignUpForm({
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
+              placeholder="asha_k"
               invalid={Boolean(errors.username) || usernameState === "taken"}
+              className={authInputClass}
               {...register("username")}
             />
             <UsernameStatus state={usernameState} />
@@ -425,12 +519,14 @@ export function SignUpForm({
           error={errors.password?.message}
           hint="At least 8 characters."
           required
+          className="mb-2"
         >
-          <Input
+          <PasswordInput
             id="signup-password"
-            type="password"
             autoComplete="new-password"
+            placeholder="Choose a password"
             invalid={Boolean(errors.password)}
+            className={authInputClass}
             {...register("password")}
           />
         </Field>
@@ -472,17 +568,17 @@ export function SignUpForm({
           ) : null}
         </div>
 
-        <Button type="submit" block size="lg" loading={isSubmitting} loadingLabel="Creating account…">
+        <Button
+          type="submit"
+          block
+          size="lg"
+          className={authSubmitClass}
+          loading={isSubmitting}
+          loadingLabel="Creating account…"
+        >
           Create account
         </Button>
       </form>
-
-      {googleEnabled ? (
-        <>
-          <OrDivider />
-          <GoogleButton next={next} label="Continue with Google" />
-        </>
-      ) : null}
 
       <p className="mt-4 flex items-start gap-1.5 text-small text-ink-subtle">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />

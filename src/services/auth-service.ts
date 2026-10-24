@@ -36,7 +36,7 @@ export function friendlyAuthError(message: string, code?: string): string {
     return "That email and password don't match. Check them and try again.";
   }
   if (text.includes("email not confirmed")) {
-    return "Please confirm your email address first — check your inbox for our link.";
+    return "Please confirm your email first — open the link we sent you, then sign in.";
   }
   if (text.includes("user already registered") || code === "user_already_exists") {
     return "An account with this email already exists. Try signing in instead.";
@@ -189,6 +189,44 @@ export async function signInWithGoogle(nextPath = "/"): Promise<AuthResult> {
       queryParams: { prompt: "select_account" },
     },
   });
+  if (error) {
+    return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
+  }
+  return { ok: true, data: undefined };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Email confirmation                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * True when a sign-in failed only because the address has not been confirmed.
+ *
+ * Supabase reports this as `email_not_confirmed`; older responses only carry the
+ * message. Both are checked because the code field is not guaranteed on every
+ * error shape.
+ */
+export function isEmailUnconfirmed(code?: string, message?: string): boolean {
+  if (code === "email_not_confirmed") return true;
+  // The message may already be the friendly copy, which says "confirm your
+  // email", not the provider's "email not confirmed".
+  return /email not confirmed|confirm your email/.test((message ?? "").toLowerCase());
+}
+
+/**
+ * Send a fresh confirmation link.
+ *
+ * Supabase rate-limits this endpoint, so the caller shows the provider's own
+ * message rather than pretending it always worked.
+ */
+export async function resendConfirmation(email: string): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.trim(),
+    options: { emailRedirectTo: absoluteUrl("/auth/callback") },
+  });
+
   if (error) {
     return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
   }

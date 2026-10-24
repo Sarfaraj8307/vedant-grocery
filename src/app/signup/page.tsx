@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthCard } from "@/components/auth/auth-card";
 import { SignUpForm } from "@/components/auth/auth-forms";
 import { getSessionUser } from "@/lib/auth";
 import { getAuthProviderCapabilities } from "@/lib/auth-providers";
@@ -31,8 +31,8 @@ export default async function SignUpPage({
   const next = typeof query.next === "string" ? query.next : "/";
 
   return (
-    <AuthShell
-      title="Create your account"
+    <AuthCard
+      title="Create account"
       subtitle={
         providers.emailAutoConfirm
           ? "You will be shopping in under a minute."
@@ -53,6 +53,6 @@ export default async function SignUpPage({
       <Suspense fallback={<div className="h-80" />}>
         <SignUpForm googleEnabled={providers.google} nextPath={next} />
       </Suspense>
-    </AuthShell>
+    </AuthCard>
   );
 }

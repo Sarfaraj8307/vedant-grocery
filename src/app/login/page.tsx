@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthCard } from "@/components/auth/auth-card";
 import { LoginForm } from "@/components/auth/auth-forms";
 import { getSessionUser } from "@/lib/auth";
 import { getAuthProviderCapabilities } from "@/lib/auth-providers";
@@ -34,8 +34,8 @@ export default async function LoginPage({
   const error = typeof query.error === "string" ? query.error : null;
 
   return (
-    <AuthShell
-      title="Welcome back"
+    <AuthCard
+      title="Login Here"
       subtitle="Sign in to reorder favourites and track deliveries."
       footer={
         <>
@@ -62,6 +62,6 @@ export default async function LoginPage({
       <Suspense fallback={<div className="h-64" />}>
         <LoginForm googleEnabled={providers.google} />
       </Suspense>
-    </AuthShell>
+    </AuthCard>
   );
 }
