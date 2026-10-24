@@ -38,10 +38,33 @@ class SlotsViewModel(private val slotRepository: SlotRepository) : ViewModel() {
     fun start() {
         if (started) return
         started = true
-        load()
+        bootstrap()
     }
 
     fun reload() = load()
+
+    /**
+     * Materialise the recurring window, then read it.
+     *
+     * This is what makes the dates roll forward **by themselves**. Every time the
+     * screen opens, `ensure_delivery_slots` tops up today … today+[days] in IST,
+     * so the operator never has to press "generate" to see tomorrow appear. The
+     * server side is idempotent (it skips any `starts_at` that already exists) and
+     * skips windows that have already closed, so calling it on every open is safe.
+     *
+     * A failure here is **not fatal**: the existing rows are still read and shown,
+     * and the toolbar action retries. Slots that are already there must never be
+     * hidden just because topping up failed.
+     */
+    private fun bootstrap() {
+        _uiState.update { it.copy(phase = ContentPhase.Loading, loadError = null, isEnsuring = true) }
+        viewModelScope.launch {
+            val days = _uiState.value.days
+            runCatching { slotRepository.ensureSlots(windowStart(), days) }
+            _uiState.update { it.copy(isEnsuring = false) }
+            load()
+        }
+    }
 
     /** `ensure_delivery_slots` — materialise the recurring slots, then re-read. */
     fun ensureSlots() {

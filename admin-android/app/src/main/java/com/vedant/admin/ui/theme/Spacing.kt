@@ -66,6 +66,8 @@ data class Sizing(
     val progressStroke: Dp = 2.dp,
     /** Glyph size for empty/error states. */
     val emptyIcon: Dp = 48.dp,
+    /** The tinted disc behind an empty/error glyph. */
+    val emptyBadge: Dp = 88.dp,
     /** Border width for outlined controls. */
     val border: Dp = 1.dp,
 
@@ -93,6 +95,10 @@ data class Sizing(
     val skeletonRow: Dp = 18.dp,
     /** The lift under a pinned action bar. */
     val cardShadow: Dp = 8.dp,
+    /** Tonal lift on a section card — enough to separate it from the page. */
+    val cardTonalElevation: Dp = 1.dp,
+    /** Tonal lift under the app bar so it reads above scrolling content. */
+    val topBarElevation: Dp = 2.dp,
 )
 
 val LocalSpacing = staticCompositionLocalOf { Spacing() }

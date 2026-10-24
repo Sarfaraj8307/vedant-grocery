@@ -28,6 +28,10 @@ import com.vedant.admin.ui.theme.VedantTheme
  * Built from primitives rather than `TopAppBar` so there is no experimental API
  * and the layout is fully ours. Icon-only actions get a content description —
  * an icon button without one is invisible to a screen reader.
+ *
+ * A faint `tonalElevation` (2 dp) lifts the bar just enough to separate it
+ * from the content below without a heavy shadow. The hairline divider
+ * remains as the structural border.
  */
 @Composable
 fun VedantTopBar(
@@ -40,7 +44,11 @@ fun VedantTopBar(
     val spacing = VedantTheme.spacing
     val sizing = VedantTheme.sizing
 
-    Surface(color = MaterialTheme.colorScheme.surface, modifier = modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = sizing.topBarElevation,
+        modifier = modifier,
+    ) {
         Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

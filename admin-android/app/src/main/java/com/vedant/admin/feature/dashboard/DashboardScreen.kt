@@ -3,6 +3,7 @@ package com.vedant.admin.feature.dashboard
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -26,21 +26,20 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -48,22 +47,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.vedant.admin.ui.components.PrimaryButton
+import com.vedant.admin.ui.components.PipelineStat
+import com.vedant.admin.ui.components.SectionCard
+import com.vedant.admin.ui.components.StatTile
+import com.vedant.admin.ui.components.pressScale
 import com.vedant.admin.ui.theme.Berry500
-import com.vedant.admin.ui.theme.Marigold600
-import com.vedant.admin.ui.theme.Marigold700
-import com.vedant.admin.ui.theme.SurfaceWhite
+import com.vedant.admin.ui.theme.DURATION_STANDARD
+import com.vedant.admin.ui.theme.EasingDecelerate
 import com.vedant.admin.ui.theme.Leaf100
 import com.vedant.admin.ui.theme.Leaf500
 import com.vedant.admin.ui.theme.Leaf600
 import com.vedant.admin.ui.theme.Leaf700
 import com.vedant.admin.ui.theme.Leaf800
 import com.vedant.admin.ui.theme.LocalReduceMotion
+import com.vedant.admin.ui.theme.Marigold600
+import com.vedant.admin.ui.theme.Marigold700
+import com.vedant.admin.ui.theme.SurfaceWhite
 import com.vedant.admin.ui.theme.VedantTheme
+import com.vedant.admin.ui.theme.staggerDelay
 import kotlinx.coroutines.delay
 
 /**
@@ -95,8 +99,12 @@ private data class DashboardTile(
  *  • `LocalReduceMotion` short-circuits the animation entirely — the tiles are
  *    simply there. Motion is decoration, never information.
  *
- * Order acceptance stays a full-width card above the grid because it is the one
- * control the owner reaches for in a hurry.
+ * **Order acceptance is a tile, not a banner.** It used to occupy a full-width
+ * card above the grid, which handed a rarely-used control the most valuable
+ * space on the screen. It now sits at the end of the grid — still one tap away,
+ * but no longer competing with the destinations the operator opens every day.
+ * Its tile subtitle carries the live open/closed state, so "are we taking
+ * orders?" is still answerable without opening anything.
  */
 @Composable
 fun DashboardScreen(
@@ -108,6 +116,7 @@ fun DashboardScreen(
     onOpenSlots: () -> Unit,
     onOpenSupport: () -> Unit,
     onOpenAnalytics: () -> Unit,
+    onOpenOrderAcceptance: () -> Unit,
     onOpenStoreSettings: () -> Unit,
     onOpenProfile: () -> Unit,
     onSignOut: () -> Unit,
@@ -118,7 +127,6 @@ fun DashboardScreen(
 
     val viewModel: DashboardViewModel = viewModel(factory = factory)
     val dash by viewModel.uiState.collectAsStateWithLifecycle()
-    var stopReason by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { viewModel.start() }
 
     val tiles = listOf(
@@ -159,7 +167,7 @@ fun DashboardScreen(
         ),
         DashboardTile(
             title = "Reporting",
-            subtitle = "Today's numbers",
+            subtitle = "Numbers & history",
             icon = Icons.Filled.Analytics,
             onClick = onOpenAnalytics,
             accent = Leaf500,
@@ -171,15 +179,33 @@ fun DashboardScreen(
             onClick = onOpenStoreSettings,
             accent = Leaf700,
         ),
+        DashboardTile(
+            title = "Order acceptance",
+            subtitle = when (dash.accepting) {
+                true -> "Accepting orders"
+                false -> "Closed to new orders"
+                null -> "Status unknown"
+            },
+            icon = Icons.Filled.PauseCircle,
+            onClick = onOpenOrderAcceptance,
+            accent = when (dash.accepting) {
+                true -> Leaf600
+                false -> Berry500
+                null -> Marigold700
+            },
+        ),
     )
 
     Column(modifier = modifier.fillMaxSize()) {
         // --- Hero ------------------------------------------------------------
+        // A three-stop gradient (Leaf600 -> Leaf700 -> Leaf800) gives the hero
+        // more depth than a two-stop pair — the top reads brighter where the
+        // brand name sits, and deepens toward the content edge.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.verticalGradient(listOf(Leaf700, Leaf800)),
+                    Brush.verticalGradient(listOf(Leaf600, Leaf700, Leaf800)),
                 ),
         ) {
             Column(
@@ -232,18 +258,12 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.md),
             modifier = Modifier.fillMaxSize(),
         ) {
-            // --- Order acceptance (full width, above the grid) ----------------
+            // --- Today at a glance ------------------------------------------
+            // Two headline figures, then the pipeline. Placed above the
+            // destinations because "how is today going?" is the question the
+            // owner opens the app to answer, and it is answered without a tap.
             item(span = { GridItemSpan(maxLineSpan) }) {
-                OrderAcceptanceCard(
-                    accepting = dash.accepting,
-                    isSaving = dash.isSaving,
-                    message = dash.message,
-                    messageIsError = dash.messageIsError,
-                    reason = stopReason,
-                    onReasonChange = { stopReason = it },
-                    onStart = { viewModel.setAccepting(true, null) },
-                    onStop = { viewModel.setAccepting(false, stopReason) },
-                )
+                TodaySection(counts = dash.counts)
             }
 
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -260,7 +280,6 @@ fun DashboardScreen(
                     DashboardGridTile(tile)
                 }
             }
-
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Surface(
                     onClick = onOpenProfile,
@@ -293,10 +312,86 @@ fun DashboardScreen(
 }
 
 /**
+ * The day's numbers: two headline figures and the live pipeline.
+ *
+ * Shape follows HyperUI's `application/stats` cards — an icon in a tinted
+ * circle, a quiet label, a heavy value — then a compact four-up pipeline row
+ * underneath, which is the same idea as their stat strip but without four
+ * nested cards on a phone-width screen.
+ *
+ * **Every unknown renders as an em dash, never as zero.** [counts] is null
+ * until the first read lands and stays null if that read failed; painting "0"
+ * there would tell the owner there is no work waiting when in fact nobody
+ * asked the server. A zero the server actually reported still shows as "0",
+ * because that is a fact.
+ */
+@Composable
+private fun TodaySection(counts: DashboardCounts?) {
+    val spacing = VedantTheme.spacing
+    val unknown = "—"
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+            StatTile(
+                label = "Today's orders",
+                value = counts?.todaysOrders?.toString() ?: unknown,
+                icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                accent = Leaf600,
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                label = "Today's sales",
+                value = counts?.todaysSales?.format() ?: unknown,
+                icon = Icons.Filled.Payments,
+                accent = Marigold600,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        Spacer(Modifier.size(spacing.md))
+
+        SectionCard(title = "Right now") {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                PipelineStat(
+                    label = "New",
+                    value = counts?.pending?.toString() ?: unknown,
+                    // Pending is the only bucket that means "someone is
+                    // waiting on us", so it alone takes the accent colour.
+                    emphasis = (counts?.pending ?: 0) > 0,
+                    modifier = Modifier.weight(1f),
+                )
+                PipelineStat(
+                    label = "Packing",
+                    value = counts?.active?.toString() ?: unknown,
+                    modifier = Modifier.weight(1f),
+                )
+                PipelineStat(
+                    label = "Ready",
+                    value = counts?.ready?.toString() ?: unknown,
+                    modifier = Modifier.weight(1f),
+                )
+                PipelineStat(
+                    label = "Out",
+                    value = counts?.outForDelivery?.toString() ?: unknown,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/**
  * Fade + rise a child once, staggered by its position in the grid.
  *
  * Skipped entirely when [enabled] is false (reduce motion), in which case the
  * child renders at its final position with no animation frame at all.
+ *
+ * Uses the shared motion vocabulary from `Motion.kt`: 320 ms decelerate
+ * tween, stagger capped at 350 ms so the last tile in a long list doesn't
+ * wait seconds before it appears.
  */
 @Composable
 private fun RevealOnMount(
@@ -313,8 +408,14 @@ private fun RevealOnMount(
     // getter, so it cannot be read inside `graphicsLayer`'s draw scope.
     val rise = with(LocalDensity.current) { VedantTheme.spacing.xxl.toPx() }
     LaunchedEffect(Unit) {
-        delay(index * 55L)
-        progress.animateTo(1f, animationSpec = tween(durationMillis = 320))
+        delay(staggerDelay(index))
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(
+                durationMillis = DURATION_STANDARD + 20, // 320 ms
+                easing = EasingDecelerate,
+            ),
+        )
     }
     Box(
         modifier = Modifier.graphicsLayer {
@@ -326,16 +427,21 @@ private fun RevealOnMount(
     }
 }
 
-/** One destination: tinted icon, title, subtitle, elevated card. */
+/** One destination: tinted icon, title, subtitle, elevated card with press feedback. */
 @Composable
 private fun DashboardGridTile(tile: DashboardTile) {
     val spacing = VedantTheme.spacing
+    val interactionSource = remember { MutableInteractionSource() }
+
     Surface(
         onClick = tile.onClick,
         shape = RoundedCornerShape(VedantTheme.radius.xl),
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = VedantTheme.sizing.cardShadow,
-        modifier = Modifier.fillMaxWidth(),
+        interactionSource = interactionSource,
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressScale(interactionSource),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
@@ -363,101 +469,6 @@ private fun DashboardGridTile(tile: DashboardTile) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-/** The one-click stop/resume control, kept full-width and above the grid. */
-@Composable
-private fun OrderAcceptanceCard(
-    accepting: Boolean?,
-    isSaving: Boolean,
-    message: String?,
-    messageIsError: Boolean,
-    reason: String,
-    onReasonChange: (String) -> Unit,
-    onStart: () -> Unit,
-    onStop: () -> Unit,
-) {
-    val spacing = VedantTheme.spacing
-    Surface(
-        shape = RoundedCornerShape(VedantTheme.radius.xl),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = VedantTheme.sizing.cardShadow,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-            modifier = Modifier.padding(spacing.lg),
-        ) {
-            Text(
-                text = "Order acceptance",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(VedantTheme.spacing.sm)
-                        .background(
-                            when (accepting) {
-                                true -> Leaf500
-                                false -> MaterialTheme.colorScheme.error
-                                null -> MaterialTheme.colorScheme.outline
-                            },
-                            CircleShape,
-                        ),
-                )
-                Spacer(Modifier.size(spacing.sm))
-                Text(
-                    text = when (accepting) {
-                        true -> "Accepting orders"
-                        false -> "Not accepting orders"
-                        null -> "Status unknown"
-                    },
-                    style = MaterialTheme.typography.titleSmall,
-                )
-            }
-            Text(
-                text = "Closing stops NEW orders immediately. Existing orders, " +
-                    "delivery and support keep working.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            if (accepting == false) {
-                PrimaryButton(
-                    text = "Start taking orders",
-                    onClick = onStart,
-                    isInFlight = isSaving,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                OutlinedTextField(
-                    value = reason,
-                    onValueChange = onReasonChange,
-                    label = { Text("Reason (required)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                PrimaryButton(
-                    text = "Stop taking orders",
-                    onClick = onStop,
-                    isInFlight = isSaving,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            message?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (messageIsError) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        Leaf600
-                    },
-                )
-            }
         }
     }
 }

@@ -3,6 +3,7 @@ package com.vedant.admin.data.remote
 import com.vedant.admin.data.remote.dto.DeliveryIssueInsertDto
 import com.vedant.admin.data.remote.dto.DashboardCountsDto
 import com.vedant.admin.data.remote.dto.DeliveryOrderDto
+import com.vedant.admin.data.remote.dto.OrderHistoryDto
 import com.vedant.admin.data.remote.dto.SalesTodayDto
 import com.vedant.admin.data.remote.dto.SlotLoadDto
 import io.github.jan.supabase.SupabaseClient
@@ -91,6 +92,42 @@ interface AdminRpc {
 
     /** `admin_sales_today()` — gross/discounts/adjustments/refunds/net/AOV. */
     suspend fun salesToday(): SalesTodayDto?
+
+    /**
+     * `admin_sales_range(p_from, p_to)` — the same breakdown as [salesToday] but
+     * for an inclusive date range, one row per day.
+     *
+     * This is what makes reporting more than a single day's snapshot: the owner
+     * can pick last week or last month and see every day, including days with no
+     * orders (the RPC generates the series, so a quiet Tuesday is a zero row
+     * rather than a missing one — a gap in the chart must not read as "no data").
+     *
+     * Gated server-side on `private.can_manage_users()`.
+     *
+     * The default body throws rather than returning an empty list: a test double
+     * that has not stubbed reporting should fail loudly if it is ever asked for
+     * reporting data, never quietly report "no orders" for a store that has them.
+     */
+    suspend fun salesRange(from: String, to: String): List<SalesTodayDto> =
+        throw UnsupportedOperationException("salesRange is not stubbed by this AdminRpc")
+
+    /**
+     * `admin_order_history(p_from, p_to, p_limit, p_offset)` — the individual
+     * orders behind the totals, newest first.
+     *
+     * Full transparency: status, every money column the server holds, the item
+     * count and the customer name. Amounts are the server's, never recomputed
+     * here, so a reconciled figure cannot disagree with the database.
+     *
+     * Gated server-side on `private.can_manage_users()`.
+     */
+    suspend fun orderHistory(
+        from: String,
+        to: String,
+        limit: Int = 50,
+        offset: Int = 0,
+    ): List<OrderHistoryDto> =
+        throw UnsupportedOperationException("orderHistory is not stubbed by this AdminRpc")
 
     /**
      * `admin_set_order_acceptance(p_accepting, p_reason)` — stop or resume trade.
@@ -196,6 +233,31 @@ class SupabaseAdminRpc(private val client: SupabaseClient) : AdminRpc {
 
     override suspend fun salesToday(): SalesTodayDto? =
         client.postgrest.rpc("admin_sales_today").decodeList<SalesTodayDto>().firstOrNull()
+
+    override suspend fun salesRange(from: String, to: String): List<SalesTodayDto> =
+        client.postgrest.rpc(
+            function = "admin_sales_range",
+            parameters = buildJsonObject {
+                put("p_from", from)
+                put("p_to", to)
+            },
+        ).decodeList()
+
+    override suspend fun orderHistory(
+        from: String,
+        to: String,
+        limit: Int,
+        offset: Int,
+    ): List<OrderHistoryDto> =
+        client.postgrest.rpc(
+            function = "admin_order_history",
+            parameters = buildJsonObject {
+                put("p_from", from)
+                put("p_to", to)
+                put("p_limit", limit)
+                put("p_offset", offset)
+            },
+        ).decodeList()
 
     override suspend fun isAcceptingOrders(): Boolean? = runCatching {
         client.postgrest.from("store_settings")

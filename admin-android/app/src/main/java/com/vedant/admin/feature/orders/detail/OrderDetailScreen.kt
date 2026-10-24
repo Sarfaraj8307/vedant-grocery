@@ -528,13 +528,21 @@ private fun TimelineSection(history: List<OrderStatusEvent>) {
     }
     SectionCard(title = "Timeline") {
         events.forEachIndexed { index, event ->
-            TimelineRow(event = event, isLast = index == events.lastIndex)
+            TimelineRow(
+                event = event,
+                isLast = index == events.lastIndex,
+                // The newest entry is the order's *current* state, so it gets
+                // the filled, ringed marker and the stronger type. Everything
+                // above it is history and recedes — the operator reads one
+                // line, not eight, to answer "where is this order now?".
+                isLatest = index == events.lastIndex,
+            )
         }
     }
 }
 
 @Composable
-private fun TimelineRow(event: OrderStatusEvent, isLast: Boolean) {
+private fun TimelineRow(event: OrderStatusEvent, isLast: Boolean, isLatest: Boolean) {
     val spacing = VedantTheme.spacing
     val sizing = VedantTheme.sizing
     Row(
@@ -542,7 +550,9 @@ private fun TimelineRow(event: OrderStatusEvent, isLast: Boolean) {
             .fillMaxWidth()
             .height(IntrinsicSize.Min),
     ) {
-        // The rail: a dot, then a connector down to the next entry.
+        // The rail: a dot, then a connector down to the next entry. The
+        // connector is drawn on every row but the last, so the segments stack
+        // into one continuous line — the same shape HyperUI's timeline uses.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -550,12 +560,33 @@ private fun TimelineRow(event: OrderStatusEvent, isLast: Boolean) {
                 .fillMaxHeight(),
         ) {
             Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .padding(top = spacing.xs)
-                    .size(spacing.sm)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
+                    .size(sizing.iconSm),
+            ) {
+                if (isLatest) {
+                    // A soft ring marks the live step without adding an icon.
+                    Box(
+                        modifier = Modifier
+                            .size(sizing.iconSm)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(if (isLatest) spacing.sm else spacing.sm - spacing.xxs)
+                        .clip(CircleShape)
+                        .background(
+                            if (isLatest) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                        ),
+                )
+            }
             if (!isLast) {
                 Box(
                     modifier = Modifier
@@ -575,7 +606,16 @@ private fun TimelineRow(event: OrderStatusEvent, isLast: Boolean) {
         ) {
             Text(
                 text = event.toStatus?.label ?: event.toStatusRaw,
-                style = MaterialTheme.typography.titleSmall,
+                style = if (isLatest) {
+                    MaterialTheme.typography.titleSmall
+                } else {
+                    MaterialTheme.typography.bodyMedium
+                },
+                color = if (isLatest) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
             event.createdAt?.let {
                 Text(

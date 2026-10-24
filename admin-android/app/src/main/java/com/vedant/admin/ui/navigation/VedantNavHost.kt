@@ -29,6 +29,7 @@ import com.vedant.admin.feature.dashboard.DashboardScreen
 import com.vedant.admin.feature.orders.detail.OrderDetailScreen
 import com.vedant.admin.feature.orders.list.OrdersListScreen
 import com.vedant.admin.feature.slots.SlotsScreen
+import com.vedant.admin.feature.settings.acceptance.OrderAcceptanceScreen
 import com.vedant.admin.feature.settings.appearance.AppearanceScreen
 import com.vedant.admin.feature.settings.profile.ProfileScreen
 import com.vedant.admin.feature.settings.store.StoreSettingsScreen
@@ -102,6 +103,7 @@ fun VedantNavHost(
                 onOpenSlots = { navController.navigate(Routes.SLOTS) },
                 onOpenSupport = { navController.navigate(Routes.SUPPORT) },
                 onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) },
+                onOpenOrderAcceptance = { navController.navigate(Routes.ORDER_ACCEPTANCE) },
                 onOpenStoreSettings = { navController.navigate(Routes.STORE_SETTINGS) },
                 onOpenProfile = { navController.navigate(Routes.PROFILE) },
                 onSignOut = sessionViewModel::signOut,
@@ -243,6 +245,13 @@ fun VedantNavHost(
         }
 
         // --- Settings -------------------------------------------------------
+
+        composable(Routes.ORDER_ACCEPTANCE) {
+            OrderAcceptanceScreen(
+                factory = factory,
+                onBack = { navController.popBackStack() },
+            )
+        }
 
         composable(Routes.STORE_SETTINGS) {
             StoreSettingsScreen(

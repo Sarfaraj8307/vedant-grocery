@@ -16,7 +16,13 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class StoreSettingsDto(
-    val id: String? = null,
+    /**
+     * The singleton's primary key. Decoded through [FlexibleIdSerializer] because
+     * the live column is the integer `1` (`id=1 CHECK id=1`), which a plain
+     * `String?` cannot accept — that mismatch is what stopped the Store-settings
+     * screen from loading.
+     */
+    @Serializable(with = FlexibleIdSerializer::class) val id: String? = null,
     @SerialName("store_name") val storeName: String? = null,
     val phone: String? = null,
     val whatsapp: String? = null,

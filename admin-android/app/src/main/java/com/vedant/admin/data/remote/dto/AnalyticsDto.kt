@@ -29,7 +29,12 @@ data class DashboardCountsDto(
 )
 
 /**
- * One row of `public.admin_sales_today()`.
+ * One row of `public.admin_sales_today()` **or** `public.admin_sales_range()`.
+ *
+ * Both RPCs return the identical column set — `admin_sales_today` is simply the
+ * one-day case of `admin_sales_range` — so a single DTO serves both. Keeping one
+ * shape means a figure on the screen is parsed the same way whether it came from
+ * a one-day read or a 30-day read.
  *
  * `refunds` is the cancelled/rejected value handed back — it is reported so the
  * owner sees gross and net side by side rather than a single flattering number.
@@ -47,4 +52,33 @@ data class SalesTodayDto(
     val deliveryRevenue: Money? = null,
     @Serializable(with = MoneySerializer::class) val net: Money? = null,
     @Serializable(with = MoneySerializer::class) val aov: Money? = null,
+)
+
+/**
+ * One row of `public.admin_order_history(p_from, p_to, p_limit, p_offset)`.
+ *
+ * Full transparency for reconciliation: every figure the server holds for the
+ * order is carried through, including the adjustment (rejected-item) amount and
+ * the item count, so the owner can explain any total without opening the order.
+ *
+ * `customerName` is `""` when the order has no linked profile — the RPC
+ * coalesces it, so the client never has to decide what a null name means.
+ */
+@Serializable
+data class OrderHistoryDto(
+    @SerialName("order_id") val orderId: String,
+    @SerialName("order_status") val orderStatus: String? = null,
+    @SerialName("placed_at") val placedAt: String? = null,
+    @SerialName("final_total")
+    @Serializable(with = MoneySerializer::class)
+    val finalTotal: Money? = null,
+    @Serializable(with = MoneySerializer::class) val subtotal: Money? = null,
+    @SerialName("delivery_fee")
+    @Serializable(with = MoneySerializer::class)
+    val deliveryFee: Money? = null,
+    @SerialName("adjustment_amount")
+    @Serializable(with = MoneySerializer::class)
+    val adjustmentAmount: Money? = null,
+    @SerialName("item_count") val itemCount: Int? = null,
+    @SerialName("customer_name") val customerName: String? = null,
 )

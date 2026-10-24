@@ -3,6 +3,7 @@ package com.vedant.admin.data.repository
 import com.vedant.admin.core.logging.AppLog
 import com.vedant.admin.core.result.Outcome
 import com.vedant.admin.core.result.outcomeOf
+import com.vedant.admin.core.time.AppClock
 import com.vedant.admin.data.remote.AdminRpc
 import com.vedant.admin.data.remote.SlotRemoteSource
 import com.vedant.admin.data.remote.mapper.toDomain
@@ -36,12 +37,14 @@ class SlotRepositoryImpl(
     }
 
     override suspend fun slotLoad(from: Instant, days: Int): Outcome<List<SlotLoad>> = outcomeOf {
-        adminRpc.adminSlotLoad(from.toString(), days).map { it.toDomain() }
+        // `admin_slot_load(p_from date, p_days int)` — a calendar date in IST,
+        // never the UTC midnight instant (that names the previous day).
+        adminRpc.adminSlotLoad(AppClock.istDateOf(from), days).map { it.toDomain() }
     }
 
     override suspend fun ensureSlots(from: Instant, days: Int): Outcome<Unit> = outcomeOf {
         AppLog.i(TAG, "ensureSlots from=$from days=$days")
-        adminRpc.ensureDeliverySlots(from.toString(), days)
+        adminRpc.ensureDeliverySlots(AppClock.istDateOf(from), days)
     }
 
     override suspend fun saveSlot(draft: DeliverySlotDraft): Outcome<DeliverySlot> = outcomeOf {

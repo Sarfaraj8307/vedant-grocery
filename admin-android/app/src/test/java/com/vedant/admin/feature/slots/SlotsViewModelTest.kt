@@ -230,6 +230,21 @@ class SlotsViewModelTest {
         }
 
     @Test
+    fun `start materialises the window automatically so the dates roll forward`() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            slots.listResult = Outcome.Success(listOf(testSlot(id = "s1")))
+            val vm = viewModel()
+
+            vm.start()
+            advanceUntilIdle()
+
+            // Opening the screen must top the window up on its own — that is what
+            // makes tomorrow appear every day without pressing "generate".
+            assertEquals(1, slots.ensureCalls)
+            assertEquals(ContentPhase.Data, vm.uiState.value.phase)
+        }
+
+    @Test
     fun `ensureSlots materialises the window and re-reads it`() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val vm = viewModel()
@@ -239,8 +254,24 @@ class SlotsViewModelTest {
             vm.ensureSlots()
             advanceUntilIdle()
 
-            assertEquals(1, slots.ensureCalls)
+            // Two: one from the automatic top-up on open, one from the press.
+            assertEquals(2, slots.ensureCalls)
             assertFalse(vm.uiState.value.isEnsuring)
+        }
+
+    @Test
+    fun `a failed automatic top-up still shows the existing slots`() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            slots.listResult = Outcome.Success(listOf(testSlot(id = "s1")))
+            slots.ensureResult = Outcome.Failure(AppError.Network)
+            val vm = viewModel()
+
+            vm.start()
+            advanceUntilIdle()
+
+            // Topping up failing must never hide the schedule that already exists.
+            assertEquals(ContentPhase.Data, vm.uiState.value.phase)
+            assertEquals(listOf("s1"), vm.uiState.value.slots.map { it.id })
         }
 
     @Test

@@ -105,11 +105,16 @@ class SlotRepositoryImplTest {
     // --- writes -------------------------------------------------------------
 
     @Test
-    fun `ensureSlots calls the RPC with the window`() = runTest {
+    fun `ensureSlots sends an IST calendar date, not a UTC instant`() = runTest {
         val result = repository.ensureSlots(from, days = 3)
 
         assertTrue(result is Outcome.Success)
-        assertEquals(listOf("ensure:$from:3"), rpc.calls)
+        // `ensure_delivery_slots(p_from date, p_days int)` takes a **date**, so the
+        // client must send a calendar date. `from` is the UTC midnight instant of
+        // an IST day (2026-10-11T00:00:00Z is 05:30 IST on the 11th); sending the
+        // instant itself would name a timestamp, which the `date` parameter
+        // cannot accept — the original defect behind "slots never appear".
+        assertEquals(listOf("ensure:2026-10-11:3"), rpc.calls)
     }
 
     @Test

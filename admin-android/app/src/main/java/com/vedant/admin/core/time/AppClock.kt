@@ -50,6 +50,25 @@ object AppClock {
         return Instant.fromEpochMilliseconds(start.toEpochMilliseconds() + MILLIS_PER_DAY)
     }
 
+    /**
+     * `2026-10-24` — today's **IST calendar date**, the literal PostgREST expects
+     * for a `date` parameter.
+     *
+     * The admin RPCs (`ensure_delivery_slots`, `admin_slot_load`) take a `date`,
+     * not a timestamp. Sending the UTC midnight instant of an IST day would name
+     * the *previous* day (IST midnight is 18:30 UTC the day before), so the day
+     * must be named as a calendar date in the store's own zone.
+     */
+    fun todayIstDate(): String = istDateOf(now())
+
+    /** The IST calendar date of [instant], as `YYYY-MM-DD`. */
+    fun istDateOf(instant: Instant): String {
+        val local = toIst(instant)
+        return "${local.year}-" +
+            "${local.monthNumber.toString().padStart(2, '0')}-" +
+            local.dayOfMonth.toString().padStart(2, '0')
+    }
+
     /** `11 Oct 2026, 16:42` — 24-hour, unambiguous for delivery windows. */
     fun formatDateTime(instant: Instant): String {
         val local = toIst(instant)

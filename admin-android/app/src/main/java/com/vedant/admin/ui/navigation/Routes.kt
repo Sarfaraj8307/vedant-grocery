@@ -83,6 +83,9 @@ object Routes {
     /** Delivery slots. */
     const val SLOTS = "slots"
 
+    /** Order acceptance (stop/resume trade). */
+    const val ORDER_ACCEPTANCE = "order-acceptance"
+
     // --- Settings (Phase 4) -------------------------------------------------
 
     /** The store's single-row configuration. */

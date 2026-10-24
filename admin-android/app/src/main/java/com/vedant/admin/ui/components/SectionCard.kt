@@ -22,6 +22,10 @@ import com.vedant.admin.ui.theme.VedantTheme
  * Each section of an order (items, totals, delivery, timeline) is one of these,
  * so the screen reads like a receipt: a clear label, then its rows. The card uses
  * the theme `surface` colour so dark mode reads as layered rather than outlined.
+ *
+ * A subtle `tonalElevation` (1 dp) gives the card the faintest lift over the
+ * background — enough to distinguish it from the paper surface without
+ * introducing a visible shadow that would look heavy on a dense receipt.
  */
 @Composable
 fun SectionCard(
@@ -32,6 +36,7 @@ fun SectionCard(
     val spacing = VedantTheme.spacing
     Surface(
         color = MaterialTheme.colorScheme.surface,
+        tonalElevation = VedantTheme.sizing.cardTonalElevation,
         shape = RoundedCornerShape(VedantTheme.radius.lg),
         modifier = modifier.fillMaxWidth(),
     ) {

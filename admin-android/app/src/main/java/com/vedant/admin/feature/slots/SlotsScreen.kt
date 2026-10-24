@@ -1,12 +1,18 @@
 package com.vedant.admin.feature.slots
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,7 +29,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -34,8 +39,15 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.ViewModelProvider
@@ -56,9 +68,14 @@ import com.vedant.admin.ui.components.SecondaryButton
 import com.vedant.admin.ui.components.StateScaffold
 import com.vedant.admin.ui.components.StatusBadge
 import com.vedant.admin.ui.components.VedantTopBar
+import com.vedant.admin.ui.theme.EasingDecelerate
+import com.vedant.admin.ui.theme.LocalReduceMotion
 import com.vedant.admin.ui.theme.VedantTheme
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.atStartOfDayIn
+
+/** How long a slot's utilisation bar takes to fill on first paint. */
+private const val BAR_GROW_MS = 600
 
 /**
  * S11 — Delivery slots.
@@ -237,11 +254,49 @@ private fun SlotCard(
             Spacer(Modifier.size(spacing.sm))
 
             if (load != null) {
-                LinearProgressIndicator(
-                    progress = { load.utilisation },
-                    color = if (load.isFull) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth(),
+                // A hand-built bar rather than LinearProgressIndicator, because
+                // the track and the fill both need the pill radius HyperUI's
+                // progress pattern uses. It also lets the fill *grow* from zero
+                // on first paint (AnimVault's `barGrow`), which reads as the day
+                // filling up instead of a bar that was always there.
+                val reduceMotion = LocalReduceMotion.current
+                var appeared by remember(load.utilisation) { mutableStateOf(false) }
+                LaunchedEffect(load.utilisation) { appeared = true }
+                val fraction by animateFloatAsState(
+                    targetValue = if (appeared) load.utilisation else 0f,
+                    animationSpec = tween(
+                        durationMillis = if (reduceMotion) 0 else BAR_GROW_MS,
+                        easing = EasingDecelerate,
+                    ),
+                    label = "slot-utilisation",
                 )
+                val fillColor = if (load.isFull) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(spacing.sm)
+                        .clip(RoundedCornerShape(VedantTheme.radius.pill))
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                        .semantics {
+                            progressBarRangeInfo = ProgressBarRangeInfo(
+                                current = load.utilisation,
+                                range = 0f..1f,
+                            )
+                        },
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(VedantTheme.radius.pill))
+                            .background(fillColor),
+                    )
+                }
                 Spacer(Modifier.size(spacing.xs))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text(

@@ -1,6 +1,8 @@
 package com.vedant.admin.ui.theme
 
 import android.provider.Settings
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.platform.LocalContext
@@ -38,3 +40,43 @@ fun rememberReduceMotion(): Boolean {
         ) == 0f
     }.getOrDefault(false)
 }
+
+// ─── Motion duration tokens ──────────────────────────────────────────────
+//
+// A shared vocabulary so every screen's motion is on the same scale.
+// These are intentionally short — this is an operations tool, not a
+// marketing site. Motion must never delay an action.
+
+/** 150 ms — quick micro-interactions (press feedback, badge pop). */
+const val DURATION_QUICK = 150
+
+/** 300 ms — standard enter/exit transitions (screen content, cards). */
+const val DURATION_STANDARD = 300
+
+/** 500 ms — slightly longer reveals (staggered tiles, splash logo). */
+const val DURATION_SLOW = 500
+
+// ─── Easing curves ──────────────────────────────────────────────────────
+//
+// Material's standard easing, expressed as cubic-bezier. Using the same
+// family everywhere gives the app a coherent rhythm.
+
+/** Decelerate — incoming elements (enter, rise). */
+val EasingDecelerate: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+
+/** Accelerate — outgoing elements (exit, fade-out). */
+val EasingAccelerate: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+
+/** Standard — symmetric, for repetitive pulses and breathes. */
+val EasingStandard: Easing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
+
+// ─── Stagger helpers ─────────────────────────────────────────────────────
+
+/**
+ * The delay before tile [index] starts its enter animation, in ms.
+ *
+ * Capped at 6 tiles so a long list doesn't make the last items wait
+ * seconds before they appear. The stagger is purely decorative — if
+ * motion is reduced, every tile is shown immediately.
+ */
+fun staggerDelay(index: Int, stepMs: Long = 55L): Long = (index * stepMs).coerceAtMost(350L)
