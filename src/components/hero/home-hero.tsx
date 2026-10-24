@@ -56,13 +56,15 @@ export function HomeHero() {
           </p>
 
           <h1 className="mt-4 max-w-[22ch] animate-reveal text-display text-ink text-balance-tight [animation-delay:80ms] motion-reduce:animate-none">
-            Today&apos;s produce,
+            You&apos;ve never tasted
             <br />
-            <span className="text-leaf-700">weighed the way you want it.</span>
+            <span className="text-leaf-700">fruit this fresh.</span>
           </h1>
 
           <p className="mt-4 max-w-[46ch] animate-reveal text-body-lg text-ink-muted [animation-delay:160ms] motion-reduce:animate-none">
-            Fresh fruits and vegetables — 250&nbsp;g, 500&nbsp;g or 1&nbsp;kg. We weigh, cut and pack it fresh, then deliver the same day.
+            Picked at the market this morning, weighed to your choice of
+            250&nbsp;g, 500&nbsp;g or 1&nbsp;kg, and at your door the same day.
+            The first bite is the proof.
           </p>
 
           <div className="mt-6 flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center">

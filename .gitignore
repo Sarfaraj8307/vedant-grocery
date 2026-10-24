@@ -16,6 +16,9 @@
 # next.js
 /.next/
 /.next-old/
+# Build directories moved aside to work around a stale-cache failure. Without
+# this pattern `git add -A` stages ~100 MB of stale Turbopack cache.
+/.next.stale*/
 /out/
 
 # production

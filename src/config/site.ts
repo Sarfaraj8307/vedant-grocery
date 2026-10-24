@@ -11,9 +11,9 @@ export const site = {
     "",
   ),
   titleTemplate: "%s · Vedant Fruit & Vegetables",
-  defaultTitle: "Vedant Fruit & Vegetables — Fresh produce delivered",
+  defaultTitle: "Vedant Fruit & Vegetables — The freshest fruit you've ever tasted",
   defaultDescription:
-    "Order fresh fruits and vegetables from Vedant Fruit & Vegetables. Choose your weight, we weigh and pack to order, and deliver the same day.",
+    "Fruit picked at the market this morning, weighed to your choice of 250 g, 500 g or 1 kg, and delivered the same day. Taste the difference.",
   keywords: [
     "Vedant Fruit and Vegetables",
     "fresh fruits delivery",

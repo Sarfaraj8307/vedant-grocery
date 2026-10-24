@@ -77,9 +77,9 @@ export const telHref = phone ? `tel:${phone.dial}` : null;
 export const store: StoreConfig = {
   name: "Vedant Fruit & Vegetables",
   legalName: "Vedant Fruit & Vegetables",
-  tagline: "Fresh from the market, weighed the way you want it.",
+  tagline: "Market-fresh fruit, weighed the way you want it.",
   shortDescription:
-    "Same-day fruit and vegetable delivery. Fresh produce cut, weighed and packed to order.",
+    "Same-day fruit and vegetable delivery. Picked at the market this morning, weighed and packed to order — the freshest produce you've tasted.",
   phone,
   whatsapp,
   email: process.env.NEXT_PUBLIC_STORE_EMAIL?.trim() || null,

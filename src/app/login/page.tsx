@@ -10,7 +10,8 @@ import { getAuthProviderCapabilities } from "@/lib/auth-providers";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to your Vedant Fruit & Vegetables account.",
+  description:
+    "Sign in to your Vedant Fruit & Vegetables account for market-fresh produce, delivered the same day.",
   robots: { index: false, follow: true },
 };
 
@@ -36,7 +37,7 @@ export default async function LoginPage({
   return (
     <AuthCard
       title="Login Here"
-      subtitle="Sign in to reorder favourites and track deliveries."
+      subtitle="Sign in for fruit picked this morning — reorder favourites in two taps."
       footer={
         <>
           New to Vedant?{" "}

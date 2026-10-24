@@ -34,11 +34,11 @@ export function AuthShell({
 
         <div className="relative max-w-[34ch]">
           <p className="font-display text-h2 text-white">
-            Fresh produce, weighed exactly how you want it.
+            You&apos;ve never tasted fruit this fresh.
           </p>
           <ul className="mt-5 flex flex-col gap-2.5 text-small text-white/80">
+            <li>• Picked at the market this morning, delivered the same day</li>
             <li>• Save your addresses and reorder in two taps</li>
-            <li>• Follow every order from packed to delivered</li>
             <li>• Free delivery on orders over ₹500</li>
           </ul>
         </div>

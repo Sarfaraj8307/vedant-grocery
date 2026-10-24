@@ -14,7 +14,7 @@ import { store } from "@/config/store";
  * Layout is deliberately flexbox-only: Satori implements a subset of CSS, and
  * grid/absolute positioning inside it is unreliable.
  */
-export const alt = `${store.name} — fresh produce, weighed the way you want it`;
+export const alt = `${store.name} — the freshest fruit you've ever tasted`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -79,10 +79,10 @@ export default function OpengraphImage() {
               maxWidth: 900,
             }}
           >
-            Today&apos;s produce, weighed the way you want it.
+            You&apos;ve never tasted fruit this fresh.
           </div>
           <div style={{ fontSize: 26, color: "#55635B", maxWidth: 820 }}>
-            Choose 250 g, 500 g or 2 kg. We weigh, pack and deliver the same day.
+            Picked this morning. Choose 250 g, 500 g or 1 kg — delivered the same day.
           </div>
         </div>
 
