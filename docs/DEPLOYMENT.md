@@ -38,6 +38,20 @@ vercel deploy --prod --archive=tgz --name=vedant-grocery
 `--name` is required: the directory name contains spaces, and Vercel rejects a derived project
 name (`Project names … must be lowercase`).
 
+The project is linked (`.vercel/project.json` → `prj_KUATnxw9Hk3lzqdWiNt6lXJCjPNC`), but the link
+alone does not authenticate. **There is no GitHub → Vercel integration on this repo**
+(`gh api repos/Sarfaraj8307/vedant-grocery/deployments` is empty), so pushing to `master` does
+**not** redeploy — a CLI session or token is always required:
+
+```bash
+vercel login                                  # interactive, once per machine
+# or, for a non-interactive run:
+VERCEL_TOKEN=... vercel deploy --prod --archive=tgz --name=vedant-grocery --token="$VERCEL_TOKEN"
+```
+
+If a deploy is ever expected to follow a push automatically, connect the repo in Vercel →
+Settings → Git first; until then, pushing and deploying are two separate steps.
+
 ### `.vercelignore` matters
 
 Without it the CLI archived **1.8 GB** — `node_modules` plus a stale 2.2 GB `.next-old`.
@@ -208,8 +222,22 @@ configuration.
 
    This is Supabase's callback, **not** the app's `/auth/callback`. Getting this wrong produces
    `redirect_uri_mismatch` at Google, before the app is ever reached.
-3. **Supabase dashboard** → Authentication → Providers → Google → paste Client ID and Client
-   Secret → Enable → Save.
+3. **Enable the provider.** Either use the Supabase dashboard (Authentication → Providers →
+   Google → paste Client ID and Secret → Enable → Save), or run the scripted path, which does the
+   same write and then verifies it against the public settings endpoint:
+
+   ```bash
+   SUPABASE_ACCESS_TOKEN=sbp_... \
+   GOOGLE_CLIENT_ID=...apps.googleusercontent.com \
+   GOOGLE_CLIENT_SECRET=GOCSPX-... \
+   npm run auth:enable-google
+   ```
+
+   Add `--dry-run` to print the request body without sending it. The script merges the redirect
+   allow-list rather than replacing it, so existing preview-deployment URLs survive. It refuses to
+   set `site_url` to localhost: `.env.local` points there for development, and copying that into the
+   live project would bounce every Google sign-in to a machine only the developer can reach.
+   Localhost stays in the allow-list, which is what local development actually needs.
 4. Confirm the app URLs from the section above are still in the redirect allowlist
    (`https://vedant-grocery.vercel.app/**`), because the OAuth return path lands on
    `/auth/callback`.

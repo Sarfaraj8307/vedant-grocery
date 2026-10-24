@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bell, FileText, HeadphonesIcon, MapPin, ReceiptText, ShieldCheck } from "lucide-react";
+import { Bell, CheckCircle2, FileText, HeadphonesIcon, MapPin, ReceiptText, ShieldCheck } from "lucide-react";
 
 import { AccountDangerZone } from "@/components/account/account-actions";
 import { SignOutButton } from "@/components/account/sign-out-dialog";
@@ -33,8 +33,18 @@ export const dynamic = "force-dynamic";
  * was "your profile is being set up" — a promise, not a control. Name and phone
  * still reach us from signup and are shown here; anything else goes through
  * support.
+ *
+ * `?confirmed=1` is set by `/auth/callback` when an email link is the reason the
+ * session exists. Without the banner the customer clicks "confirm" in their inbox
+ * and lands on a normal-looking page with no acknowledgement that anything
+ * happened — which reads as "did that work?".
  */
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ confirmed?: string }>;
+}) {
+  const { confirmed } = await searchParams;
   const user = await requireUser("/account");
   const profile = await getProfile();
 
@@ -78,6 +88,19 @@ export default async function AccountPage() {
         </div>
         <SignOutButton size="sm" className="shrink-0" />
       </header>
+
+      {confirmed === "1" ? (
+        <p
+          role="status"
+          className="flex items-start gap-2.5 rounded-lg border border-leaf-200 bg-leaf-50 px-4 py-3 text-small text-leaf-800"
+        >
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-medium">Your email is confirmed.</span> You are signed
+            in and can start ordering.
+          </span>
+        </p>
+      ) : null}
 
       {/* Quick links */}
       <nav aria-label="Account sections">
