@@ -139,3 +139,98 @@ afterwards**; `generate_link` creates a real account.
 
 That is separate from the URL bug: the token was already used, expired (default 24 h), or
 superseded by a newer signup for the same address. Signing up again issues a fresh one.
+
+## Terms consent
+
+`supabase/migrations/20261025_001_terms_acceptance.sql` creates
+`public.terms_acceptances` — one immutable row per customer per terms version
+(`user_id`, `terms_version`, `accepted_at`, `source`).
+
+**This migration must be applied before the consent gate will do anything.** Until then
+`getConsentState()` cannot read the table, so it reports `checked: false` and the gate stays
+closed. That is deliberate: an unapplied migration is a deployment fault, and locking every
+customer out behind a modal whose accept button also cannot write would be worse than a missing
+consent row.
+
+Why the row is immutable: there is no UPDATE or DELETE policy, and the table privileges are
+`SELECT, INSERT` only for `authenticated`. Consent is evidence — a customer who could edit the
+row could rewrite what they agreed to. Deleting the account cascades the row away, which is the
+intended, deliberate path.
+
+### Changing the terms
+
+1. Edit the copy on `/terms`.
+2. Bump `TERMS_VERSION` (and `TERMS_UPDATED`) in `src/lib/terms.ts`.
+3. Deploy.
+
+Existing customers are then asked once more on their next sign-in. Their earlier acceptance stays
+in the table with its own timestamp and version — that is the point of versioning rather than a
+boolean on `profiles`.
+
+### Auditing
+
+```sql
+-- Who has accepted the current version, and who is outstanding
+select p.email, a.terms_version, a.accepted_at, a.source
+from public.profiles p
+left join public.terms_acceptances a
+  on a.user_id = p.id and a.terms_version = '2026-10-25'
+order by a.accepted_at desc nulls last;
+```
+
+`source` records where consent was given: `signup` (the form's checkbox, written immediately or
+on first sign-in when email confirmation deferred the session), `google`, `login` (the gate) or
+`account`.
+
+## Google sign-in (Gmail)
+
+**The code is already shipped.** `signInWithGoogle()` performs a real Supabase OAuth call, the
+callback route exchanges the code, and both `/login` and `/signup` render a "Continue with Google"
+button — but only when the live project reports the provider as enabled
+(`src/lib/auth-providers.ts`). A button that always errors would be a fake control, so it is
+hidden instead.
+
+Probed on 2026-10-24: `GET /auth/v1/settings` returns `external.google = false`. The button is
+therefore absent from the live site, and **no code change is needed to turn it on** — only
+configuration.
+
+### Enabling it
+
+1. **Google Cloud Console** → APIs & Services → OAuth consent screen → External → fill in app name,
+   support email, developer email. Publishing status can stay in *Testing* while you verify, but add
+   your own Google account under *Test users*, otherwise only that list can sign in.
+2. **Credentials** → Create credentials → OAuth client ID → **Web application**.
+   Authorised redirect URI (exactly this, no trailing slash):
+
+   ```
+   https://hyibaljxicojfoxbihdn.supabase.co/auth/v1/callback
+   ```
+
+   This is Supabase's callback, **not** the app's `/auth/callback`. Getting this wrong produces
+   `redirect_uri_mismatch` at Google, before the app is ever reached.
+3. **Supabase dashboard** → Authentication → Providers → Google → paste Client ID and Client
+   Secret → Enable → Save.
+4. Confirm the app URLs from the section above are still in the redirect allowlist
+   (`https://vedant-grocery.vercel.app/**`), because the OAuth return path lands on
+   `/auth/callback`.
+5. Verify:
+
+   ```bash
+   npm run auth:check     # exits 0 once google is true
+   ```
+
+   Then reload `/login`. The button appears on the next render; the capability probe is cached for
+   5 minutes (`revalidate: 300`), so give it that long or restart the dev server.
+
+### Why not Firebase Auth
+
+Firebase would be a **second identity system**, and every RLS policy in this database keys on
+`auth.uid()` from the Supabase JWT. A customer signed in through Firebase would carry a Firebase ID
+token, so `supabase.auth.getUser()` would return null, requests would run as `anon`, and RLS would
+deny their own orders, addresses, cart and profile. Bridging the two needs a token-exchange function
+that verifies the Firebase token and mints a Supabase JWT signed with the project's JWT secret — a
+security-critical component that duplicates, rather than adds, what Supabase already does natively.
+The admin Android app authenticates against Supabase too, so it would split the identity model in
+two. Supabase's Google provider gives the same "Sign in with Google" experience with one console
+setting and zero new moving parts.
+

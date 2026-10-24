@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bell, HeadphonesIcon, MapPin, ReceiptText } from "lucide-react";
+import { Bell, FileText, HeadphonesIcon, MapPin, ReceiptText, ShieldCheck } from "lucide-react";
 
 import { AccountDangerZone } from "@/components/account/account-actions";
-import { ProfileForm } from "@/components/account/profile-form";
-import { Button } from "@/components/ui/button";
+import { SignOutButton } from "@/components/account/sign-out-dialog";
+import { UserAvatar } from "@/components/account/user-avatar";
 import { requireUser, getProfile } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { initials, maskPhone, pluralise } from "@/lib/format";
-import { formatDate } from "@/lib/format";
+import { getConsentState } from "@/lib/terms-server";
+import { TERMS_SOURCE_LABEL, TERMS_VERSION } from "@/lib/terms";
+import { formatDate, maskPhone, pluralise } from "@/lib/format";
 import type { OrderRow } from "@/types/database";
 
 export const metadata: Metadata = {
   title: "Your account",
-  description: "Manage your details, addresses and orders.",
+  description: "Manage your addresses, orders and account.",
   robots: { index: false, follow: false },
 };
 
@@ -23,40 +24,47 @@ export const dynamic = "force-dynamic";
  * Account overview.
  *
  * `getProfile()` may legitimately return `null` — the live database has no
- * trigger creating a `profiles` row (docs/BACKEND_CONTRACT.md §7.3). Instead of
- * crashing, the page renders the correct empty state and `ProfileSync` creates
- * the row on the client within a moment of landing.
+ * trigger creating a `profiles` row (docs/BACKEND_CONTRACT.md §7.3). The header
+ * therefore falls back to the name carried in `user_metadata`, so a missing row
+ * never leaves the customer greeted as their email local-part.
+ *
+ * The former "Your details" editor is gone. It existed to let a customer edit a
+ * row that the app itself creates, and its most common state on a fresh account
+ * was "your profile is being set up" — a promise, not a control. Name and phone
+ * still reach us from signup and are shown here; anything else goes through
+ * support.
  */
 export default async function AccountPage() {
   const user = await requireUser("/account");
   const profile = await getProfile();
 
   const supabase = await getSupabaseServerClient();
-  const [{ count: addressCount }, { data: recentOrders }] = await Promise.all([
+  const [{ count: addressCount }, { data: recentOrders }, consent] = await Promise.all([
     supabase.from("addresses").select("id", { count: "exact", head: true }),
     supabase
       .from("orders")
       .select("*")
       .order("placed_at", { ascending: false })
       .limit(3),
+    getConsentState(user.id),
   ]);
 
   const orders = (recentOrders ?? []) as OrderRow[];
   const displayName =
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    [
+      profile?.first_name?.trim() || user.firstName,
+      profile?.last_name?.trim() || user.lastName,
+    ]
+      .filter(Boolean)
+      .join(" ") ||
     user.email?.split("@")[0] ||
     "there";
 
   return (
     <div className="shell flex flex-col gap-6 py-6 sm:py-8">
-      <header className="flex items-center gap-4">
-        <span
-          aria-hidden="true"
-          className="grid size-14 shrink-0 place-items-center rounded-full bg-leaf-100 font-display text-h3 text-leaf-700"
-        >
-          {initials(profile?.first_name, profile?.last_name, displayName)}
-        </span>
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-center gap-4">
+        <UserAvatar name={displayName} url={user.avatarUrl} size={56} />
+        <div className="min-w-0 flex-1">
           <h1 className="font-display text-h1 text-ink">{displayName}</h1>
           <p className="mt-0.5 truncate text-small text-ink-muted">
             {user.email}
@@ -68,6 +76,7 @@ export default async function AccountPage() {
             </p>
           ) : null}
         </div>
+        <SignOutButton size="sm" className="shrink-0" />
       </header>
 
       {/* Quick links */}
@@ -104,25 +113,60 @@ export default async function AccountPage() {
         </ul>
       </nav>
 
-      {/* Details */}
-      <section className="rounded-lg border border-line bg-surface p-4 shadow-xs sm:p-5">
-        <h2 className="font-display text-h3 text-ink">Your details</h2>
-        <p className="mt-1 mb-4 text-small text-ink-muted">
-          We use these to reach you about deliveries.
+      {/* Terms and privacy — where they are, and what this customer accepted. */}
+      <section
+        aria-labelledby="legal-heading"
+        className="rounded-lg border border-line bg-surface p-4 shadow-xs sm:p-5"
+      >
+        <h2 id="legal-heading" className="font-display text-h3 text-ink">
+          Terms &amp; privacy
+        </h2>
+        <p className="mt-1 text-small text-ink-muted">
+          What you agreed to, and where to read it in full.
         </p>
-        {profile ? (
-          <ProfileForm profile={profile} email={user.email} />
-        ) : (
-          <div className="rounded-md border border-dashed border-line-strong bg-surface-muted px-4 py-5 text-small text-ink-muted">
-            <p>
-              Your profile is being set up — this takes a moment. Refresh the page
-              if it does not appear.
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <LegalLink
+            href="/terms"
+            icon={<FileText className="size-4" aria-hidden="true" />}
+            title="Terms &amp; conditions"
+            detail="How ordering, pricing and delivery work"
+          />
+          <LegalLink
+            href="/privacy"
+            icon={<ShieldCheck className="size-4" aria-hidden="true" />}
+            title="Privacy policy"
+            detail="What we store and why"
+          />
+        </div>
+
+        <div className="mt-4 rounded-md border border-line bg-surface-muted px-3 py-3 text-small">
+          {consent.accepted && consent.current ? (
+            <p className="text-ink-muted">
+              You accepted version{" "}
+              <span className="font-medium text-ink">{consent.current.terms_version}</span>{" "}
+              of the terms on{" "}
+              <span className="font-medium text-ink">
+                {formatDate(consent.current.accepted_at)}
+              </span>
+              , {TERMS_SOURCE_LABEL[consent.current.source]}.
             </p>
-            <Button asChild variant="outline" size="sm" className="mt-3">
-              <Link href="/account">Refresh</Link>
-            </Button>
-          </div>
-        )}
+          ) : consent.latest ? (
+            <p className="text-ink-muted">
+              You accepted an earlier version of the terms on{" "}
+              <span className="font-medium text-ink">
+                {formatDate(consent.latest.accepted_at)}
+              </span>
+              . The current version ({TERMS_VERSION}) has not been accepted yet —
+              you will be asked next time you sign in.
+            </p>
+          ) : (
+            <p className="text-ink-muted">
+              We have no acceptance recorded for the current terms ({TERMS_VERSION}).
+              You will be asked to accept them next time you sign in.
+            </p>
+          )}
+        </div>
       </section>
 
       <AccountDangerZone />
@@ -156,5 +200,32 @@ function QuickLink({
         </span>
       </Link>
     </li>
+  );
+}
+
+function LegalLink({
+  href,
+  icon,
+  title,
+  detail,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-md border border-line px-3 py-2.5 transition-colors hover:border-line-strong hover:bg-surface-muted"
+    >
+      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-leaf-100 text-leaf-700">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-small font-medium text-ink">{title}</span>
+        <span className="block truncate text-caption text-ink-muted">{detail}</span>
+      </span>
+    </Link>
   );
 }

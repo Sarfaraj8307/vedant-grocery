@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { LegalList, LegalPage } from "@/components/legal/legal-page";
 import { SHOP_SETTINGS_PREVIEW } from "@/lib/pricing";
 import { formatMoney } from "@/lib/money";
+import { TERMS_UPDATED, TERMS_VERSION } from "@/lib/terms";
 import { store } from "@/config/store";
 
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms & conditions"
-      updated="7 October 2026"
+      updated={TERMS_UPDATED}
       intro={`These terms cover ordering from ${store.name} through this website. They describe how our ordering, pricing and delivery actually work.`}
       sections={[
         {
@@ -151,6 +152,57 @@ export default function TermsPage() {
           ),
         },
         {
+          id: "your-data",
+          heading: "Your data and consent",
+          body: (
+            <>
+              <p>
+                When you create an account you are asked to accept these terms and
+                our privacy policy. We record the date and the version you accepted,
+                so there is a clear record of what you agreed to. If these terms
+                change in a way that matters, you will be asked to accept the new
+                version the next time you sign in.
+              </p>
+              <p>
+                To take and deliver an order we need your name, email address, phone
+                number and delivery address, and we keep a record of the orders you
+                place. We use that information only to:
+              </p>
+              <LegalList
+                items={[
+                  "take, pack and deliver your orders, and contact you about them;",
+                  "keep accounting and tax records, as required by law;",
+                  "answer your questions and resolve problems with an order;",
+                  "send you order updates, and offers only where you have asked for them.",
+                ]}
+              />
+              <p>
+                We do not sell your data. We share only what is necessary with the
+                people who deliver your order and with the providers that host this
+                website and its database. This website never stores card details.
+              </p>
+              <p>
+                You can withdraw your consent at any time by asking us to close your
+                account. Withdrawing consent does not affect orders already placed,
+                or records we are required to keep by law. You may also ask for a copy
+                of the information we hold about you, ask us to correct it, or ask us
+                to delete it.
+              </p>
+              <p>
+                We keep order records for as long as they may be needed for
+                accounting and for resolving problems with an order, and we remove
+                account details when you ask us to close the account. You should be
+                18 or older to place an order, or have a parent or guardian place it
+                for you. The{" "}
+                <a href="/privacy" className="text-leaf-700 underline underline-offset-2">
+                  privacy policy
+                </a>{" "}
+                sets out the full detail, including how to contact us about your data.
+              </p>
+            </>
+          ),
+        },
+        {
           id: "liability",
           heading: "Our responsibility",
           body: (
@@ -170,7 +222,9 @@ export default function TermsPage() {
             <p>
               These terms may be updated; the version published here at the time you
               order is the version that applies to that order. The date at the top of
-              this page shows when it last changed.
+              this page shows when it last changed. If a change affects your rights or
+              how we handle your data, you will be asked to accept the updated version
+              the next time you sign in, and your earlier acceptance stays on record.
             </p>
           ),
         },

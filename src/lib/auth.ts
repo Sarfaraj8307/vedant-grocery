@@ -2,6 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { avatarUrlFromMetadata, profileFieldsFromMetadata } from "@/lib/profile-fields";
 import type { ProfileRow } from "@/types/database";
 
 /**
@@ -21,6 +22,11 @@ export type SessionUser = {
   id: string;
   email: string | null;
   phone: string | null;
+  /** From `user_metadata` — available before `profiles` is read. */
+  firstName: string;
+  lastName: string;
+  /** Provider picture (Google), when the provider supplied one. */
+  avatarUrl: string | null;
 };
 
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -31,10 +37,17 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   } = await supabase.auth.getUser();
 
   if (error || !user) return null;
+
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const fields = profileFieldsFromMetadata(meta);
+
   return {
     id: user.id,
     email: user.email ?? null,
     phone: user.phone ?? null,
+    firstName: fields.firstName,
+    lastName: fields.lastName,
+    avatarUrl: avatarUrlFromMetadata(meta),
   };
 }
 
@@ -67,20 +80,31 @@ export async function getProfileOrDefault(): Promise<{
   profile: ProfileRow | null;
   displayName: string;
   firstName: string;
+  avatarUrl: string | null;
 }> {
   const user = await getSessionUser();
   if (!user) {
-    return { user: null, profile: null, displayName: "", firstName: "" };
+    return {
+      user: null,
+      profile: null,
+      displayName: "",
+      firstName: "",
+      avatarUrl: null,
+    };
   }
   const profile = await getProfile();
-  const firstName = profile?.first_name?.trim() || "";
-  const lastName = profile?.last_name?.trim() || "";
+
+  // The `profiles` row can legitimately be missing (no trigger on auth.users).
+  // Falling back to the signup/OAuth metadata means the header still greets the
+  // customer by their real name instead of their email local-part.
+  const firstName = profile?.first_name?.trim() || user.firstName;
+  const lastName = profile?.last_name?.trim() || user.lastName;
   const displayName =
     [firstName, lastName].filter(Boolean).join(" ") ||
     user.email?.split("@")[0] ||
     "there";
 
-  return { user, profile, displayName, firstName };
+  return { user, profile, displayName, firstName, avatarUrl: user.avatarUrl };
 }
 
 /** Redirects to sign-in, preserving where the customer was heading. */

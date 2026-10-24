@@ -8,10 +8,12 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { SiteHeader, type HeaderCategory } from "@/components/layout/site-header";
 import { StickyCartBar } from "@/components/cart/sticky-cart-bar";
 import { CartProvider } from "@/components/cart/cart-provider";
+import { ConsentGate } from "@/components/account/consent-gate";
 import { ProfileSync } from "@/components/account/profile-sync";
 import { PwaProvider } from "@/components/pwa/pwa-provider";
 import { getCategories } from "@/lib/catalogue";
 import { getProfileOrDefault } from "@/lib/auth";
+import { getConsentState } from "@/lib/terms-server";
 import { getDeliveryLocation } from "@/lib/addresses";
 import { site, absoluteUrl } from "@/config/site";
 import { store } from "@/config/store";
@@ -99,18 +101,29 @@ export const viewport: Viewport = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [{ user, displayName }, categories, deliveryLocation] = await Promise.all([
+  const [{ user, displayName, avatarUrl }, categories, deliveryLocation] = await Promise.all([
     getProfileOrDefault().catch(() => ({
       user: null,
       profile: null,
       displayName: "",
       firstName: "",
+      avatarUrl: null,
     })),
     // The catalogue is public; a failure here must still render a usable shell
     // (with the sign-in and cart flows intact) rather than a 500.
     getCategories().catch(() => [] as Awaited<ReturnType<typeof getCategories>>),
     getDeliveryLocation().catch(() => null),
   ]);
+
+  /*
+   * Consent is resolved on the server so the gate never flashes: a client-side
+   * check would render the whole page first and then cover it with a modal.
+   * `checked === false` means the lookup failed (for example the migration has
+   * not been applied yet) — the gate then stays closed rather than locking every
+   * customer out behind a dialog whose accept button also cannot write.
+   */
+  const consent = user ? await getConsentState(user.id) : null;
+  const needsConsent = Boolean(consent?.checked && !consent.accepted);
 
   // The header shows the customer's chosen place, e.g. "Home · Pune 411001".
   const deliveryLabel = deliveryLocation
@@ -145,10 +158,14 @@ export default async function RootLayout({
               docs/BACKEND_CONTRACT.md §7.3 (no trigger exists). */}
           {user ? <ProfileSync /> : null}
 
+          {/* Blocks the app until the current terms version is accepted. */}
+          {needsConsent ? <ConsentGate needed /> : null}
+
           <SiteHeader
             categories={headerCategories}
             user={user ? { id: user.id, email: user.email } : null}
             displayName={displayName}
+            avatarUrl={avatarUrl}
             deliveryLabel={deliveryLabel}
           />
 

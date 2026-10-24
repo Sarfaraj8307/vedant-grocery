@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "auth:check": "node scripts/check-auth-providers.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

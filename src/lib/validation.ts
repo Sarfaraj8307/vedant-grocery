@@ -47,13 +47,21 @@ export type SignInInput = z.infer<typeof signInSchema>;
 /**
  * Username rules copied from `profiles_username_check` and
  * `check_username_available()` — `^[a-z0-9_]{3,24}$`.
+ *
+ * Exported as a plain regex as well as a zod schema because non-form callers
+ * need the *rule* without a zod parse: `auth-service` has to decide whether a
+ * Google handle (`john.doe`) is safe to use as a username. A second hand-copied
+ * regex is how the address-label mismatch happened (docs/KNOWN_LIMITATIONS.md),
+ * so this stays the single source.
  */
+export const USERNAME_PATTERN = /^[a-z0-9_]{3,24}$/;
+
 export const usernameSchema = z
   .string()
   .trim()
   .toLowerCase()
   .regex(
-    /^[a-z0-9_]{3,24}$/,
+    USERNAME_PATTERN,
     "Use 3–24 characters: lowercase letters, numbers and underscores",
   );
 

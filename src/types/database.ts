@@ -48,6 +48,21 @@ export type ProfileRow = {
   updated_at: string;
 };
 
+/**
+ * One accepted version of the terms (migration 20261025_001).
+ *
+ * Immutable by design: there is no UPDATE or DELETE policy, so a row is written
+ * once and stays as evidence of what the customer agreed to and when.
+ */
+export type TermsAcceptanceRow = {
+  id: string;
+  user_id: string;
+  /** Matches `TERMS_VERSION` in `lib/terms.ts`. */
+  terms_version: string;
+  accepted_at: string;
+  source: "signup" | "google" | "login" | "account";
+};
+
 export type CategoryRow = {
   id: string;
   name: string;

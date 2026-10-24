@@ -201,11 +201,28 @@ export async function getLiveOffers(): Promise<
  * `place_order` requires `starts_at > now()` and an active slot, so the client
  * applies exactly the same predicate — this guarantees the customer can never
  * pick a slot the server would reject.
+ *
+ * **Slots roll forward by themselves.** Before reading, this calls
+ * `auto_ensure_delivery_slots()`, which idempotently materialises today … today+6
+ * in IST. That is what keeps tomorrow's windows appearing every day without
+ * anyone pressing a button. The call is best-effort: it needs an authenticated
+ * session (staff), so a signed-out shopper simply reads whatever already exists
+ * rather than failing the page. `admin` screens and the admin app also trigger
+ * the same function, so the window is topped up from either surface.
  */
 export async function getDeliverySlots(
   horizonDays = 7,
 ): Promise<DeliverySlotRow[]> {
   const supabase = await getSupabaseServerClient();
+
+  // Best-effort top-up. A refusal (anon) or a network blip must not hide the
+  // slots that already exist, so the error is deliberately swallowed here.
+  try {
+    await supabase.rpc("auto_ensure_delivery_slots");
+  } catch {
+    // No session / not staff / transient failure — read what is there.
+  }
+
   const now = new Date();
   const horizon = new Date(now.getTime() + horizonDays * 86_400_000);
 

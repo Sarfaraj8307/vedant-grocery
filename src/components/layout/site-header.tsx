@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   ChevronDown,
   LogOut,
@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/logo";
 import { SearchField } from "@/components/search/search-field";
+import { SignOutDialog } from "@/components/account/sign-out-dialog";
+import { UserAvatar } from "@/components/account/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,13 +29,12 @@ import {
 } from "@/components/ui/menu";
 import {
   SheetBody,
+  SheetClose,
   SheetContent,
   SheetRoot,
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useCart } from "@/hooks/use-cart";
-import { signOut } from "@/services/auth-service";
-import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
@@ -64,14 +65,25 @@ export function SiteHeader({
   categories,
   user,
   displayName,
+  avatarUrl,
   deliveryLabel,
 }: {
   categories: HeaderCategory[];
   user: { id: string; email: string | null } | null;
   displayName: string;
+  avatarUrl: string | null;
   deliveryLabel: string | null;
 }) {
   const pathname = usePathname();
+
+  /*
+   * The sign-out confirmation is owned here, not by the menu or the sheet that
+   * opens it. A dialog rendered *inside* the mobile sheet would be dismissed by
+   * the sheet's own outside-click handling before it could be answered — the
+   * sheet treats the portalled dialog as "outside". Hoisting it to the header
+   * keeps one dialog, one owner, and works for both surfaces.
+   */
+  const [signOutOpen, setSignOutOpen] = React.useState(false);
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur-md">
@@ -129,7 +141,12 @@ export function SiteHeader({
         </nav>
 
         {user ? (
-          <AccountMenu displayName={displayName} email={user.email} />
+          <AccountMenu
+            displayName={displayName}
+            email={user.email}
+            avatarUrl={avatarUrl}
+            onRequestSignOut={() => setSignOutOpen(true)}
+          />
         ) : (
           <Link
             href="/login"
@@ -140,6 +157,18 @@ export function SiteHeader({
         )}
 
         <CartButton />
+
+        {/* Mobile: a signed-in customer sees their own face, not a "Sign in"
+            link. It doubles as the shortcut to their account. */}
+        {user ? (
+          <Link
+            href="/account"
+            aria-label={`Signed in as ${displayName}. Open your account`}
+            className="grid shrink-0 place-items-center rounded-full focus-visible:outline-none lg:hidden"
+          >
+            <UserAvatar name={displayName} url={avatarUrl} size={30} />
+          </Link>
+        ) : null}
 
         {/* Mobile-only category quick access.
             Keyed on the pathname so navigating remounts the sheet closed — the
@@ -152,10 +181,18 @@ export function SiteHeader({
             <ChevronDown className="size-4" aria-hidden="true" />
           </SheetTrigger>
           <SheetContent side="bottom" title="Browse Vedant">
-            <MobileMenuPanel categories={categories} user={user} />
+            <MobileMenuPanel
+              categories={categories}
+              user={user}
+              displayName={displayName}
+              avatarUrl={avatarUrl}
+              onRequestSignOut={() => setSignOutOpen(true)}
+            />
           </SheetContent>
         </SheetRoot>
       </div>
+
+      <SignOutDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
 
       {/*
        * Mobile delivery location — a slim second row so the location stays
@@ -228,37 +265,35 @@ function CartButton() {
 function AccountMenu({
   displayName,
   email,
+  avatarUrl,
+  onRequestSignOut,
 }: {
   displayName: string;
   email: string | null;
+  avatarUrl: string | null;
+  onRequestSignOut: () => void;
 }) {
-  const router = useRouter();
-  const [pending, setPending] = React.useState(false);
-
-  async function handleSignOut() {
-    setPending(true);
-    const result = await signOut();
-    setPending(false);
-    if (result.ok) {
-      router.push("/");
-      router.refresh();
-    }
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="hidden size-9 shrink-0 place-items-center rounded-full bg-leaf-100 text-small font-semibold text-leaf-700 transition-colors hover:bg-leaf-200 focus-visible:outline-none lg:grid"
+        className="hidden shrink-0 items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-2.5 transition-colors hover:border-line-strong hover:bg-surface-muted focus-visible:outline-none lg:flex"
         aria-label={`Account menu for ${displayName}`}
       >
-        {initials(displayName)}
+        <UserAvatar name={displayName} url={avatarUrl} size={28} />
+        <span className="max-w-[8rem] truncate text-small font-medium text-ink">
+          {displayName}
+        </span>
+        <ChevronDown className="size-3.5 shrink-0 text-ink-subtle" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuLabel className="normal-case">
           <span className="block text-caption text-ink-subtle">Signed in as</span>
           <span className="mt-0.5 block truncate text-small font-medium text-ink">
-            {email ?? displayName}
+            {displayName}
           </span>
+          {email ? (
+            <span className="block truncate text-caption text-ink-subtle">{email}</span>
+          ) : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -288,13 +323,13 @@ function AccountMenu({
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onSelect={(event) => {
-            event.preventDefault();
-            if (!pending) void handleSignOut();
-          }}
+          // No `preventDefault`: the menu closes first, then the confirmation
+          // opens. Keeping the menu mounted under a modal leaves two overlays
+          // fighting over focus.
+          onSelect={() => onRequestSignOut()}
           className="text-danger focus:bg-danger-bg [&_svg]:text-danger"
         >
-          <LogOut aria-hidden="true" /> {pending ? "Signing out…" : "Sign out"}
+          <LogOut aria-hidden="true" /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -308,14 +343,42 @@ function AccountMenu({
 function MobileMenuPanel({
   categories,
   user,
+  displayName,
+  avatarUrl,
+  onRequestSignOut,
 }: {
   categories: HeaderCategory[];
   user: { id: string; email: string | null } | null;
+  displayName: string;
+  avatarUrl: string | null;
+  onRequestSignOut: () => void;
 }) {
-  const router = useRouter();
-
   return (
     <SheetBody className="pt-2 pb-6">
+      {/*
+        Who is signed in. This replaced a "Sign in or create account" row that
+        stayed on screen for signed-in customers, which read as if the session
+        had been lost.
+      */}
+      {user ? (
+        <div className="mb-5 flex items-center gap-3 rounded-lg border border-line bg-surface-muted px-3 py-3">
+          <UserAvatar name={displayName} url={avatarUrl} size={44} />
+          <div className="min-w-0">
+            <p className="truncate text-body font-medium text-ink">{displayName}</p>
+            {user.email ? (
+              <p className="truncate text-small text-ink-muted">{user.email}</p>
+            ) : null}
+            <p className="mt-0.5 flex items-center gap-1 text-caption font-medium text-leaf-700">
+              <span
+                aria-hidden="true"
+                className="inline-block size-1.5 rounded-full bg-leaf-600"
+              />
+              Signed in
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <p className="text-caption text-ink-subtle">Shop by category</p>
       <ul className="mt-2.5 grid grid-cols-2 gap-2">
         {categories.map((category) => (
@@ -353,18 +416,18 @@ function MobileMenuPanel({
               Your account
             </MenuLink>
             <li>
-              <button
-                type="button"
-                onClick={async () => {
-                  await signOut();
-                  router.push("/");
-                  router.refresh();
-                }}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-body text-danger transition-colors hover:bg-danger-bg"
-              >
-                <LogOut className="size-[17px]" aria-hidden="true" />
-                Sign out
-              </button>
+              {/* `SheetClose` dismisses the sheet in the same tap; the dialog
+                  itself lives in the header so it survives that unmount. */}
+              <SheetClose asChild>
+                <button
+                  type="button"
+                  onClick={onRequestSignOut}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-body text-danger transition-colors hover:bg-danger-bg"
+                >
+                  <LogOut className="size-[17px]" aria-hidden="true" />
+                  Sign out
+                </button>
+              </SheetClose>
             </li>
           </>
         ) : (
