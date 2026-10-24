@@ -55,3 +55,7 @@ next-env.d.ts
 *.hprof
 
 .vercel
+
+# The admin app lives in its own repository:/n#   https://github.com/Sarfaraj8307/vedant-admin-android
+# It stays on disk here for local development, but is not tracked in this repo.
+admin-android/

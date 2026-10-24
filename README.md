@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vedant Fruit & Vegetables — customer storefront
 
-## Getting Started
+The customer-facing grocery storefront for Vedant Fruit & Vegetables: browse the
+daily catalogue, build a basket, pick a delivery slot and track the order. It is
+an installable PWA built on Next.js and Supabase.
 
-First, run the development server:
+The **admin app** (Android, Kotlin/Compose) lives in its own repository:
+[`vedant-admin-android`](https://github.com/Sarfaraj8307/vedant-admin-android).
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16.3 (App Router, Turbopack) |
+| UI | React 19, Tailwind CSS |
+| Data | Supabase — Postgres, Auth, Row Level Security |
+| Tests | Vitest (unit), Playwright config (e2e) |
+| Hosting | Vercel (see `docs/DEPLOYMENT.md`) |
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env.local     # then fill in the Supabase values
+pnpm dev                       # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` needs only the **publishable** Supabase keys. See the security note
+below — that is a deliberate constraint, not an oversight.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Development server |
+| `pnpm build` / `pnpm start` | Production build and serve |
+| `pnpm test` | Unit tests (Vitest) |
+| `pnpm lint` | ESLint |
+| `pnpm auth:check` | Reports which Supabase auth providers are actually enabled |
 
-## Learn More
+## Database
 
-To learn more about Next.js, take a look at the following resources:
+Schema changes live in `supabase/migrations/` and are applied **in filename
+order**. They are not applied automatically — a fresh environment needs them run
+against the project before the app will work.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Two things worth knowing before you run anything:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **The migrations are the schema.** There is no `seed.sql`; they create the
+  tables, RLS policies and the `SECURITY DEFINER` functions the app calls.
+- **Some features depend on a specific migration.** For example the terms consent
+  gate stays inactive until `20261025_001_terms_acceptance.sql` has been applied —
+  it fails open rather than locking customers out of a broken deploy.
 
-## Deploy on Vercel
+## Security model
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This is a customer-only application, and the architecture assumes the browser is
+hostile:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Only publishable (anon) Supabase keys are shipped. No service-role key, no
+  database password, no admin API key.
+- **Authorization is enforced in Postgres** — Row Level Security plus
+  `SECURITY DEFINER` functions — not in the client. The server-side helpers in
+  `src/lib/auth.ts` exist for good UX (redirects, personalised headers) and are
+  explicitly *not* the security boundary.
+- Every table is scoped to `auth.uid()`, so a compromised client still cannot
+  read another customer's orders, addresses or basket.
+
+## Repository layout
+
+```
+src/app/            routes (App Router)
+src/components/     UI, grouped by feature
+src/services/       data access (auth, cart, orders, catalogue)
+src/lib/            shared logic, Supabase clients, formatting
+supabase/migrations schema, RLS and SQL functions
+docs/               architecture, backend contract, deployment, known limitations
+```
+
+`docs/` is worth reading before making changes — in particular
+`docs/BACKEND_CONTRACT.md` (what the database guarantees) and
+`docs/KNOWN_LIMITATIONS.md` (what is deliberately unfinished, and why).
