@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell, CheckCircle2, FileText, HeadphonesIcon, MapPin, ReceiptText, ShieldCheck } from "lucide-react";
 
-import { AccountDangerZone } from "@/components/account/account-actions";
+import { ChangePasswordForm } from "@/components/account/change-password-form";
 import { SignOutButton } from "@/components/account/sign-out-dialog";
 import { UserAvatar } from "@/components/account/user-avatar";
 import { requireUser, getProfile } from "@/lib/auth";
@@ -136,6 +136,23 @@ export default async function AccountPage({
         </ul>
       </nav>
 
+      {/* Change password — requires the current password, so it lives on the
+          authenticated account page rather than a public route. */}
+      <section
+        aria-labelledby="change-password-heading"
+        className="rounded-lg border border-line bg-surface p-4 shadow-xs sm:p-5"
+      >
+        <h2 id="change-password-heading" className="font-display text-h3 text-ink">
+          Change password
+        </h2>
+        <p className="mt-1 text-small text-ink-muted">
+          Keep your sign-in secure. You will need your current password.
+        </p>
+        <div className="mt-4 max-w-lg">
+          <ChangePasswordForm />
+        </div>
+      </section>
+
       {/* Terms and privacy — where they are, and what this customer accepted. */}
       <section
         aria-labelledby="legal-heading"
@@ -192,7 +209,6 @@ export default async function AccountPage({
         </div>
       </section>
 
-      <AccountDangerZone />
     </div>
   );
 }

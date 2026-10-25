@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
 /** Only same-origin relative paths are ever honoured. */
 function sanitiseNext(raw: string | null): string {
-  if (!raw) return "/account";
-  if (!raw.startsWith("/") || raw.startsWith("//")) return "/account";
+  if (!raw) return "/";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
   return raw;
 }

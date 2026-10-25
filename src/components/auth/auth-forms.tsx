@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { Check, Info, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/menu";
@@ -34,7 +34,6 @@ import {
   signUpWithPassword,
   updatePassword,
 } from "@/services/auth-service";
-import { store } from "@/config/store";
 
 /**
  * Auth forms.
@@ -579,12 +578,6 @@ export function SignUpForm({
           Create account
         </Button>
       </form>
-
-      <p className="mt-4 flex items-start gap-1.5 text-small text-ink-subtle">
-        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-        We only use your details to deliver your orders and reach you about them.
-        {store.needsOwnerConfiguration ? "" : ` You can reach ${store.name} any time from the contact page.`}
-      </p>
     </div>
   );
 }

@@ -346,6 +346,13 @@
    UTILITIES
    ========================================================================== */
 
+@utility rounded-pill {
+  /* The "pill" shape used across the theme (search box, chips, badges).
+     Defined here because the utility has no generated equivalent; without it
+     every `rounded-pill` element renders square. */
+  border-radius: 999px;
+}
+
 @utility shell {
   width: 100%;
   max-width: var(--shell-max);

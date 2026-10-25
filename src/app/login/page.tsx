@@ -28,8 +28,8 @@ export default async function LoginPage({
 
   // Already signed in? Nothing to do here.
   if (user) {
-    const next = typeof query.next === "string" ? query.next : "/account";
-    redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/account");
+    const next = typeof query.next === "string" ? query.next : "/";
+    redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
   }
 
   const error = typeof query.error === "string" ? query.error : null;

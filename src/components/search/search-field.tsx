@@ -83,7 +83,7 @@ export function SearchField({
           // Hide the WebKit/Blink native clear button; we draw our own so it is
           // the same size as every other control.
           "[&::-webkit-search-cancel-button]:appearance-none",
-          size === "lg" ? "h-12 text-body-lg" : "h-10 text-body",
+          size === "lg" ? "h-12 text-body-lg" : "h-11 text-body",
           className,
         )}
       />

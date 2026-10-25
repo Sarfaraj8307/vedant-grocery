@@ -259,6 +259,44 @@ export async function updatePassword(newPassword: string): Promise<AuthResult> {
   return { ok: true, data: undefined };
 }
 
+/**
+ * Change password from the account page (not the recovery flow).
+ *
+ * Requires the customer's current password to prove they own the account, then
+ * sets the new one. Supabase stores passphrases hashed in `auth.users` — there
+ * is no plain-text column to update, so the change is a single Auth API call.
+ */
+export async function changePassword(input: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { ok: false, error: "Please sign in again." };
+
+  // Verify the current password first — the customer must prove ownership before
+  // we let them set a new one.
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: input.currentPassword,
+  });
+  if (signInError) {
+    return {
+      ok: false,
+      error: friendlyAuthError(signInError.message, signInError.code),
+      code: signInError.code,
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: input.newPassword });
+  if (error) {
+    return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
+  }
+  return { ok: true, data: undefined };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Sign out                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -488,36 +526,3 @@ export async function updateProfile(input: {
   return { ok: true, data: undefined };
 }
 
-/**
- * Account deletion.
- *
- * Supabase requires a server-side admin call to delete an `auth.users` row, so
- * this is intentionally **not** implemented client-side — doing so would need a
- * service-role key in the browser, which this project forbids.
- * The signed-in customer can clear their personal data themselves (addresses,
- * cart, profile fields) and a recorded request is handled by the store.
- * See docs/TASK_STATE.md → BLOCKED and the account page copy.
- */
-export const ACCOUNT_DELETION_MODE = "request" as const;
-
-/** Wipe the customer's own rows. RLS scopes every delete to `auth.uid()`. */
-export async function clearPersonalData(): Promise<AuthResult> {
-  const supabase = getSupabaseBrowserClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Please sign in again." };
-
-  const [addresses, cart] = await Promise.all([
-    supabase.from("addresses").delete().eq("user_id", user.id),
-    supabase.from("cart_items").delete().eq("user_id", user.id),
-  ]);
-
-  if (addresses.error) {
-    return { ok: false, error: "We couldn't remove your saved addresses." };
-  }
-  if (cart.error) {
-    return { ok: false, error: "We couldn't empty your basket." };
-  }
-  return { ok: true, data: undefined };
-}

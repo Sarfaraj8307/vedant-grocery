@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -130,74 +129,3 @@ export function ProfileForm({
   );
 }
 
-/**
- * Destructive-account actions.
- *
- * Account *deletion* requires a server-side admin call against `auth.users`,
- * which would need a service-role key — explicitly forbidden in this
- * customer-only app (see docs/BACKEND_CONTRACT.md §3). So the honest
- * implementation is: the customer can erase all their personal data themselves,
- * and a recorded deletion request is actioned by the store. The UI says exactly
- * that rather than offering a button that pretends to delete the account.
- */
-export function DangerZone({ onClearData }: { onClearData: () => Promise<void> }) {
-  const [working, setWorking] = React.useState(false);
-  const [confirming, setConfirming] = React.useState(false);
-
-  return (
-    <div className="rounded-lg border border-danger-bg bg-surface p-4 sm:p-5">
-      <h2 className="font-display text-h3 text-ink">Your data</h2>
-      <p className="mt-1.5 max-w-[58ch] text-small text-ink-muted">
-        You can erase your saved addresses and basket at any time. Past orders are
-        kept for accounting and warranty reasons, as set out in our privacy
-        policy.
-      </p>
-
-      {confirming ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="danger"
-            size="sm"
-            loading={working}
-            loadingLabel="Erasing…"
-            onClick={async () => {
-              setWorking(true);
-              await onClearData();
-              setWorking(false);
-              setConfirming(false);
-            }}
-          >
-            Yes, erase my saved data
-          </Button>
-          <Button
-            type="button"
-            variant="quiet"
-            size="sm"
-            onClick={() => setConfirming(false)}
-          >
-            Cancel
-          </Button>
-        </div>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-3 border-danger/40 text-danger hover:bg-danger-bg"
-          onClick={() => setConfirming(true)}
-        >
-          Erase saved addresses &amp; basket
-        </Button>
-      )}
-
-      <p className="mt-4 border-t border-line pt-3 text-small text-ink-subtle">
-        To delete your account entirely, message the shop from the{" "}
-        <a href="/contact" className="text-leaf-700 underline underline-offset-2">
-          contact page
-        </a>{" "}
-        and we will remove it within 7 days.
-      </p>
-    </div>
-  );
-}

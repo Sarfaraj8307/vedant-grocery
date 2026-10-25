@@ -8,6 +8,9 @@
 .vercel
 node_modules
 .next-old
+# Stale build directories moved aside for a cache workaround — ~150 MB of dead
+# Turbopack cache. Without this line the CLI uploads them on every deploy.
+/.next.stale*/
 .next
 /admin-android
 /docs
