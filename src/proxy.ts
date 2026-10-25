@@ -28,14 +28,21 @@ export function proxy(request: NextRequest) {
 }
 
 async function handle(request: NextRequest) {
-  // Rate limit sensitive routes
+  // Rate limit sensitive routes.
+  //
+  // IMPORTANT: these limits gate **page loads only**. Every auth action (sign
+  // in, sign up, social OAuth) is performed client-side directly against
+  // Supabase Auth, so it never transits this proxy. This limiter therefore
+  // cannot stop brute-forcing — it only stops someone hammering the page
+  // itself. The thresholds are kept generous so normal navigation/refresh
+  // never locks a genuine user out.
   const { pathname: reqPath } = request.nextUrl;
   const ip = getClientIp(request);
   const limits: Record<string, { limit: number; windowMs: number }> = {
-    "/login": { limit: 20, windowMs: 60_000 },
-    "/signup": { limit: 10, windowMs: 60_000 },
-    "/auth/callback": { limit: 30, windowMs: 60_000 },
-    "/checkout": { limit: 30, windowMs: 60_000 },
+    "/login": { limit: 120, windowMs: 60_000 },
+    "/signup": { limit: 60, windowMs: 60_000 },
+    "/auth/callback": { limit: 240, windowMs: 60_000 },
+    "/checkout": { limit: 240, windowMs: 60_000 },
   };
   for (const [prefix, cfg] of Object.entries(limits)) {
     if (reqPath.startsWith(prefix)) {
