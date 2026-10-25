@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Bell, CheckCircle2, FileText, HeadphonesIcon, MapPin, ReceiptText, ShieldCheck } from "lucide-react";
 
 import { ChangePasswordForm } from "@/components/account/change-password-form";
+import { ProfileForm } from "@/components/account/profile-form";
 import { SignOutButton } from "@/components/account/sign-out-dialog";
 import { UserAvatar } from "@/components/account/user-avatar";
 import { requireUser, getProfile } from "@/lib/auth";
@@ -28,11 +29,11 @@ export const dynamic = "force-dynamic";
  * therefore falls back to the name carried in `user_metadata`, so a missing row
  * never leaves the customer greeted as their email local-part.
  *
- * The former "Your details" editor is gone. It existed to let a customer edit a
- * row that the app itself creates, and its most common state on a fresh account
- * was "your profile is being set up" — a promise, not a control. Name and phone
- * still reach us from signup and are shown here; anything else goes through
- * support.
+ * The "My Account" section renders the editable profile form (`ProfileForm`) for
+ * first name, last name, phone and email. Email is read-only — changing the
+ * address on an account goes through support. When the live database has not yet
+ * produced the `profiles` row, the section shows a short setup note instead of a
+ * fake control.
  *
  * `?confirmed=1` is set by `/auth/callback` when an email link is the reason the
  * session exists. Without the banner the customer clicks "confirm" in their inbox
@@ -135,6 +136,30 @@ export default async function AccountPage({
           />
         </ul>
       </nav>
+
+      {/* My Account — the editable personal details (name, surname, phone,
+          email). Email is read-only because changing it goes through support. */}
+      <section
+        aria-labelledby="my-account-heading"
+        className="rounded-lg border border-line bg-surface p-4 shadow-xs sm:p-5"
+      >
+        <h2 id="my-account-heading" className="font-display text-h3 text-ink">
+          My Account
+        </h2>
+        <p className="mt-1 text-small text-ink-muted">
+          Your name and contact details, and how we reach you about orders.
+        </p>
+        <div className="mt-4">
+          {profile ? (
+            <ProfileForm profile={profile} email={user.email} />
+          ) : (
+            <p className="text-small text-ink-muted">
+              We are setting up your profile — refresh in a moment to edit your
+              details.
+            </p>
+          )}
+        </div>
+      </section>
 
       {/* Change password — requires the current password, so it lives on the
           authenticated account page rather than a public route. */}

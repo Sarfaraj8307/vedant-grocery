@@ -55,10 +55,12 @@ export function HomeHero() {
             {store.name}
           </p>
 
-          <h1 className="mt-4 max-w-[22ch] animate-reveal text-display text-ink text-balance-tight [animation-delay:80ms] motion-reduce:animate-none">
-            You&apos;ve never tasted
+          <h1 className="mt-4 max-w-[24ch] animate-reveal text-display text-ink text-balance-tight [animation-delay:80ms] motion-reduce:animate-none">
+            Fresh <span className="text-leaf-700">fruits</span>
             <br />
-            <span className="text-leaf-700">fruit this fresh.</span>
+            &amp; <span className="text-beet-600">veggies</span>,
+            <br />
+            <span className="text-marigold-700">picked fresh today.</span>
           </h1>
 
           <p className="mt-4 max-w-[46ch] animate-reveal text-body-lg text-ink-muted [animation-delay:160ms] motion-reduce:animate-none">

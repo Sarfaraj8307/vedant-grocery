@@ -178,7 +178,7 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
           fake control, which this project does not ship. */}
       {googleEnabled ? (
         <>
-          <GoogleButton next={next} label="Sign in with Google" />
+          <GoogleButton next={next} label="Log in with Google" />
           <OrDivider />
         </>
       ) : null}

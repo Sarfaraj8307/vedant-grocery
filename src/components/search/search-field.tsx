@@ -59,8 +59,8 @@ export function SearchField({
     >
       <Search
         className={cn(
-          "pointer-events-none absolute left-3 text-ink-subtle",
-          size === "lg" ? "size-5" : "size-[18px]",
+          "pointer-events-none absolute text-ink-subtle",
+          size === "lg" ? "left-5 size-5" : "left-4 size-[18px]",
         )}
         aria-hidden="true"
       />
@@ -76,14 +76,17 @@ export function SearchField({
         aria-label="Search products"
         enterKeyHint="search"
         className={cn(
-          "w-full rounded-pill border-[1.5px] border-line-strong bg-surface pl-9.5 pr-10 text-ink shadow-xs",
-          "placeholder:text-ink-subtle",
+          "w-full rounded-full border-[1.5px] border-line-strong bg-surface text-ink",
+          "shadow-[0_1px_2px_rgba(26,46,26,0.08)]",
+          "placeholder:text-ink-subtle hover:border-line-strong",
           "transition-[border-color,box-shadow] duration-[var(--motion-fast)]",
-          "focus:border-leaf-600 focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-leaf-600/20",
+          "focus:border-leaf-600 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-leaf-600/15",
           // Hide the WebKit/Blink native clear button; we draw our own so it is
           // the same size as every other control.
           "[&::-webkit-search-cancel-button]:appearance-none",
-          size === "lg" ? "h-12 text-body-lg" : "h-11 text-body",
+          size === "lg"
+            ? "h-14 rounded-[1.75rem] pl-12 pr-12 text-body-lg"
+            : "h-12 rounded-full pl-11 pr-11 text-body",
           className,
         )}
       />
