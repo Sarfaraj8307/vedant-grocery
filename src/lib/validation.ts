@@ -90,6 +90,14 @@ export const forgotPasswordSchema = z.object({
 
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
+/** 6-digit email OTP code. */
+export const otpTokenSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "Enter the 6-digit code from your email");
+
+export type OtpTokenInput = z.infer<typeof otpTokenSchema>;
+
 export const resetPasswordSchema = z
   .object({
     password: z

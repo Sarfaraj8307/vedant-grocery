@@ -53,6 +53,17 @@ export function friendlyAuthError(message: string, code?: string): string {
   if (text.includes("failed to fetch") || text.includes("network")) {
     return "We couldn't reach the server. Check your connection and try again.";
   }
+  if (
+    text.includes("token has expired") ||
+    text.includes("invalid token") ||
+    text.includes("otp") ||
+    text.includes("code is invalid") ||
+    code === "otp_expired" ||
+    code === "invalid_otp" ||
+    code === "otp_disabled"
+  ) {
+    return "That code is invalid or has expired. Check the latest email and try again.";
+  }
   if (text.includes("provider is not enabled")) {
     return "That sign-in method isn't available right now. Please use email instead.";
   }
@@ -227,6 +238,111 @@ export async function resendConfirmation(email: string): Promise<AuthResult> {
     options: { emailRedirectTo: absoluteUrl("/auth/callback") },
   });
 
+  if (error) {
+    return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
+  }
+  return { ok: true, data: undefined };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Email OTP                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Send a one-time password (OTP) code to an email address to verify a new
+ * sign-up. `shouldCreateUser: true` creates an unconfirmed user carrying the
+ * profile fields in `user_metadata`; the code itself confirms the account.
+ */
+export async function sendSignupOtp(input: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+}): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: input.email.trim(),
+    options: {
+      shouldCreateUser: true,
+      data: {
+        first_name: input.firstName.trim(),
+        last_name: input.lastName.trim(),
+        username: input.username.toLowerCase(),
+        // The user has already ticked the terms on the form; record the version
+        // so the acceptance row can be written once the OTP confirms them.
+        accepted_terms_version: TERMS_VERSION,
+        accepted_terms_at: new Date().toISOString(),
+      },
+    },
+  });
+  if (error) {
+    return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
+  }
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Verify the sign-up OTP. On success Supabase confirms the user and creates a
+ * session; we then persist the profile row and the terms acceptance, mirroring
+ * what `signUpWithPassword` does when signup returns a session.
+ */
+export async function verifySignupOtp(input: {
+  email: string;
+  token: string;
+}): Promise<AuthResult<{ userId: string }>> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: input.email.trim(),
+    token: input.token.trim(),
+    type: "signup",
+  });
+  if (error || !data.user) {
+    const message = error
+      ? friendlyAuthError(error.message, error.code)
+      : "That code did not match.";
+    return { ok: false, error: message, code: error?.code };
+  }
+
+  const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>;
+  await createProfileRow({
+    firstName: String(meta.first_name ?? ""),
+    lastName: String(meta.last_name ?? ""),
+    username: String(meta.username ?? ""),
+    email: data.user.email ?? null,
+  });
+  await insertAcceptance(data.user.id, "signup");
+
+  return { ok: true, data: { userId: data.user.id } };
+}
+
+/** Send a password-recovery OTP code. Does not create an account. */
+export async function sendRecoveryOtp(email: string): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: { shouldCreateUser: false },
+  });
+  if (error) {
+    return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
+  }
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Verify a password-recovery OTP. On success Supabase returns a recovery
+ * session, which lets the caller call `updatePassword()` without being signed
+ * in through the normal flow.
+ */
+export async function verifyRecoveryOtp(input: {
+  email: string;
+  token: string;
+}): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase.auth.verifyOtp({
+    email: input.email.trim(),
+    token: input.token.trim(),
+    type: "recovery",
+  });
   if (error) {
     return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
   }

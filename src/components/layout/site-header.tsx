@@ -7,9 +7,7 @@ import {
   ChevronDown,
   LogOut,
   MapPin,
-  Package,
   Receipt,
-  Search,
   ShoppingBag,
   Sparkles,
   UserRound,
@@ -27,13 +25,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/menu";
-import {
-  SheetBody,
-  SheetClose,
-  SheetContent,
-  SheetRoot,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { useCart } from "@/hooks/use-cart";
 import { cn } from "@/lib/utils";
 
@@ -170,26 +161,18 @@ export function SiteHeader({
           </Link>
         ) : null}
 
-        {/* Mobile-only category quick access.
-            Keyed on the pathname so navigating remounts the sheet closed — the
-            declarative alternative to closing it in an effect. */}
-        <SheetRoot key={pathname}>
-          <SheetTrigger
+        {/* Mobile account entry when signed out. Signed-in customers already see
+            their avatar link above; this keeps a single, clean account shortcut
+            on phones without a secondary browse menu. */}
+        {!user ? (
+          <Link
+            href="/login"
+            aria-label="Sign in or create account"
             className="grid size-9 shrink-0 place-items-center rounded-md text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink lg:hidden"
-            aria-label="Browse categories and help"
           >
-            <ChevronDown className="size-4" aria-hidden="true" />
-          </SheetTrigger>
-          <SheetContent side="bottom" title="Browse Vedant">
-            <MobileMenuPanel
-              categories={categories}
-              user={user}
-              displayName={displayName}
-              avatarUrl={avatarUrl}
-              onRequestSignOut={() => setSignOutOpen(true)}
-            />
-          </SheetContent>
-        </SheetRoot>
+            <UserRound className="size-5" aria-hidden="true" />
+          </Link>
+        ) : null}
       </div>
 
       <SignOutDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
@@ -340,124 +323,3 @@ function AccountMenu({
 /* Mobile menu panel                                                          */
 /* -------------------------------------------------------------------------- */
 
-function MobileMenuPanel({
-  categories,
-  user,
-  displayName,
-  avatarUrl,
-  onRequestSignOut,
-}: {
-  categories: HeaderCategory[];
-  user: { id: string; email: string | null } | null;
-  displayName: string;
-  avatarUrl: string | null;
-  onRequestSignOut: () => void;
-}) {
-  return (
-    <SheetBody className="pt-2 pb-6">
-      {/*
-        Who is signed in. This replaced a "Sign in or create account" row that
-        stayed on screen for signed-in customers, which read as if the session
-        had been lost.
-      */}
-      {user ? (
-        <div className="mb-5 flex items-center gap-3 rounded-lg border border-line bg-surface-muted px-3 py-3">
-          <UserAvatar name={displayName} url={avatarUrl} size={44} />
-          <div className="min-w-0">
-            <p className="truncate text-body font-medium text-ink">{displayName}</p>
-            {user.email ? (
-              <p className="truncate text-small text-ink-muted">{user.email}</p>
-            ) : null}
-            <p className="mt-0.5 flex items-center gap-1 text-caption font-medium text-leaf-700">
-              <span
-                aria-hidden="true"
-                className="inline-block size-1.5 rounded-full bg-leaf-600"
-              />
-              Signed in
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      <p className="text-caption text-ink-subtle">Shop by category</p>
-      <ul className="mt-2.5 grid grid-cols-2 gap-2">
-        {categories.map((category) => (
-          <li key={category.id}>
-            <Link
-              href={`/categories/${category.id}`}
-              className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-3 py-2.5 text-small font-medium text-ink transition-colors hover:border-leaf-600/40 hover:bg-leaf-50"
-            >
-              <span aria-hidden="true" className="text-lg">
-                {category.glyph}
-              </span>
-              <span className="truncate">{category.name}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      <p className="mt-6 text-caption text-ink-subtle">Shortcuts</p>
-      <ul className="mt-2.5 flex flex-col gap-1">
-        <MenuLink href="/offers" icon={<Sparkles aria-hidden="true" />}>
-          Today&apos;s offers
-        </MenuLink>
-        <MenuLink href="/search" icon={<Search aria-hidden="true" />}>
-          Search everything
-        </MenuLink>
-        <MenuLink href="/orders" icon={<Receipt aria-hidden="true" />}>
-          Order history
-        </MenuLink>
-        <MenuLink href="/contact" icon={<Package aria-hidden="true" />}>
-          Help &amp; support
-        </MenuLink>
-        {user ? (
-          <>
-            <MenuLink href="/account" icon={<UserRound aria-hidden="true" />}>
-              Your account
-            </MenuLink>
-            <li>
-              {/* `SheetClose` dismisses the sheet in the same tap; the dialog
-                  itself lives in the header so it survives that unmount. */}
-              <SheetClose asChild>
-                <button
-                  type="button"
-                  onClick={onRequestSignOut}
-                  className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-body text-danger transition-colors hover:bg-danger-bg"
-                >
-                  <LogOut className="size-[17px]" aria-hidden="true" />
-                  Sign out
-                </button>
-              </SheetClose>
-            </li>
-          </>
-        ) : (
-          <MenuLink href="/login" icon={<UserRound aria-hidden="true" />}>
-            Sign in or create account
-          </MenuLink>
-        )}
-      </ul>
-    </SheetBody>
-  );
-}
-
-function MenuLink({
-  href,
-  icon,
-  children,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <li>
-      <Link
-        href={href}
-        className="flex items-center gap-3 rounded-md px-3 py-2.5 text-body text-ink transition-colors hover:bg-surface-muted [&_svg]:size-[17px] [&_svg]:text-ink-muted"
-      >
-        {icon}
-        {children}
-      </Link>
-    </li>
-  );
-}

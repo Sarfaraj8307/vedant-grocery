@@ -15,6 +15,7 @@ import { authInputClass, authSubmitClass } from "@/components/auth/auth-card";
 import { PasswordInput } from "@/components/auth/password-input";
 import {
   forgotPasswordSchema,
+  otpTokenSchema,
   resetPasswordSchema,
   signInSchema,
   signUpSchema,
@@ -28,11 +29,13 @@ import {
   checkUsername,
   isEmailUnconfirmed,
   resendConfirmation,
-  sendPasswordReset,
+  sendRecoveryOtp,
+  sendSignupOtp,
   signInWithGoogle,
   signInWithPassword,
-  signUpWithPassword,
   updatePassword,
+  verifyRecoveryOtp,
+  verifySignupOtp,
 } from "@/services/auth-service";
 
 /**
@@ -282,6 +285,105 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* OTP step — shared by signup and password recovery                          */
+/* -------------------------------------------------------------------------- */
+
+function OtpStep({
+  email,
+  title = "Enter the code we sent you",
+  buttonLabel = "Verify & continue",
+  onSubmit,
+  onResend,
+  onBack,
+  error,
+  verifying = false,
+  resending = false,
+}: {
+  email: string;
+  title?: string;
+  buttonLabel?: string;
+  onSubmit: (token: string) => void;
+  onResend: () => void;
+  onBack: () => void;
+  error?: string | null;
+  verifying?: boolean;
+  resending?: boolean;
+}) {
+  const [token, setToken] = React.useState("");
+  const tokenError = otpTokenSchema.safeParse(token).success ? null : "Enter the 6-digit code";
+
+  return (
+    <div>
+      <div className="rounded-md border border-line bg-surface-muted px-3.5 py-3 text-small">
+        <p className="text-ink-muted">We sent a code to</p>
+        <p className="mt-0.5 font-medium text-ink">{email}</p>
+      </div>
+
+      {error ? (
+        <p
+          role="alert"
+          className="mb-3 mt-3 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      <form
+        className="mt-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (otpTokenSchema.safeParse(token).success) onSubmit(token.trim());
+        }}
+        noValidate
+      >
+        <Field label="One-time code" htmlFor="otp-code" error={token ?? tokenError}>
+          <Input
+            id="otp-code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="123456"
+            value={token}
+            onChange={(event) => setToken(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            className="text-center text-body-lg tracking-[0.3em]"
+          />
+        </Field>
+
+        <Button
+          type="submit"
+          block
+          size="lg"
+          className={authSubmitClass + " mt-2"}
+          loading={verifying}
+          loadingLabel="Verifying…"
+          disabled={!otpTokenSchema.safeParse(token).success}
+        >
+          {buttonLabel}
+        </Button>
+      </form>
+
+      <div className="mt-4 flex items-center justify-between gap-2 text-small">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={resending}
+          className="font-medium text-leaf-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-ink-subtle"
+        >
+          {resending ? "Sending…" : "Resend the code"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ========================================================================== */
 /* Sign up                                                                    */
 /* ========================================================================== */
@@ -298,7 +400,6 @@ export function SignUpForm({
   const searchParams = useSearchParams();
   const next = safeNext(nextPath ?? searchParams.get("next"));
 
-  const [pendingConfirmation, setPendingConfirmation] = React.useState(false);
   /** Result of the last completed lookup, tagged with the name it was for. */
   const [lookup, setLookup] = React.useState<{
     for: string;
@@ -361,6 +462,22 @@ export function SignUpForm({
             : "taken"
           : "checking";
 
+  // --- Email OTP sign-up state ---
+  // Step 1: profile + password form. Step 2: enter the emailed code. Only after
+  // the code is verified do we apply the chosen password to the new account.
+  const [step, setStep] = React.useState<"form" | "otp">("form");
+  const [otpEmail, setOtpEmail] = React.useState("");
+  const [otpPassword, setOtpPassword] = React.useState("");
+  const [otpMeta, setOtpMeta] = React.useState({
+    firstName: "",
+    lastName: "",
+    username: "",
+  });
+  const [otpError, setOtpError] = React.useState<string | null>(null);
+  const [sendingOtp, setSendingOtp] = React.useState(false);
+  const [verifyingOtp, setVerifyingOtp] = React.useState(false);
+  const [resending, setResending] = React.useState(false);
+
   async function onSubmit(values: SignUpInput) {
     // Re-check server truth at submit time to close the race between the last
     // debounced lookup and the submit click. If the name was taken in the
@@ -381,21 +498,48 @@ export function SignUpForm({
       }
     }
 
-    const result = await signUpWithPassword({
+    setSendingOtp(true);
+    setOtpError(null);
+    const result = await sendSignupOtp({
       email: values.email,
-      password: values.password,
       firstName: values.firstName,
       lastName: values.lastName ?? "",
       username: values.username,
     });
+    setSendingOtp(false);
 
     if (!result.ok) {
       setError("root", { message: result.error });
       return;
     }
 
-    if (result.data.needsEmailConfirmation) {
-      setPendingConfirmation(true);
+    setOtpEmail(values.email);
+    setOtpPassword(values.password);
+    setOtpMeta({
+      firstName: values.firstName,
+      lastName: values.lastName ?? "",
+      username: values.username,
+    });
+    setStep("otp");
+  }
+
+  async function confirmOtp(token: string) {
+    setVerifyingOtp(true);
+    setOtpError(null);
+
+    const result = await verifySignupOtp({ email: otpEmail, token });
+    if (!result.ok) {
+      setOtpError(result.error);
+      setVerifyingOtp(false);
+      return;
+    }
+
+    // The OTP confirmed the account and created a session. Now set the password
+    // the new customer chose on the form.
+    const pw = await updatePassword(otpPassword);
+    if (!pw.ok) {
+      setOtpError(pw.error);
+      setVerifyingOtp(false);
       return;
     }
 
@@ -403,28 +547,25 @@ export function SignUpForm({
     router.refresh();
   }
 
-  if (pendingConfirmation) {
+  async function resendOtp() {
+    setResending(true);
+    setOtpError(null);
+    const result = await sendSignupOtp({ email: otpEmail, ...otpMeta });
+    setResending(false);
+    if (!result.ok) setOtpError(result.error);
+  }
+
+  if (step === "otp") {
     return (
-      <div>
-        <span
-          aria-hidden="true"
-          className="mb-4 grid size-11 place-items-center rounded-full bg-success-bg text-success"
-        >
-          <Check className="size-5" />
-        </span>
-        <h2 className="font-display text-h3 text-ink">Check your inbox to confirm</h2>
-        <p className="mt-2 text-body text-ink-muted">
-          We have sent a confirmation link to your email address. Open it and you
-          will be signed in automatically — then you can start shopping.
-        </p>
-        <p className="mt-3 text-small text-ink-subtle">
-          Nothing arrived? Check your spam folder, or{" "}
-          <Link href="/login" className="text-leaf-700 underline underline-offset-2">
-            try signing in
-          </Link>{" "}
-          and we will offer to send a new link.
-        </p>
-      </div>
+      <OtpStep
+        email={otpEmail}
+        onSubmit={confirmOtp}
+        onResend={resendOtp}
+        onBack={() => setStep("form")}
+        error={otpError}
+        verifying={verifyingOtp}
+        resending={resending}
+      />
     );
   }
 
@@ -572,8 +713,8 @@ export function SignUpForm({
           block
           size="lg"
           className={authSubmitClass}
-          loading={isSubmitting}
-          loadingLabel="Creating account…"
+          loading={isSubmitting || sendingOtp}
+          loadingLabel="Sending code…"
         >
           Create account
         </Button>
@@ -618,7 +759,14 @@ function UsernameStatus({
 /* ========================================================================== */
 
 export function ForgotPasswordForm() {
-  const [sent, setSent] = React.useState(false);
+  const router = useRouter();
+  const [step, setStep] = React.useState<"form" | "otp" | "new-password">("form");
+  const [email, setEmail] = React.useState("");
+  const [otpError, setOtpError] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const [resending, setResending] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+
   const {
     register,
     handleSubmit,
@@ -626,33 +774,141 @@ export function ForgotPasswordForm() {
     setError,
   } = useForm<ForgotPasswordInput>({ resolver: zodResolver(forgotPasswordSchema) });
 
-  async function onSubmit(values: ForgotPasswordInput) {
-    const result = await sendPasswordReset(values.email);
+  const resetForm = useForm<ResetPasswordInput>({ resolver: zodResolver(resetPasswordSchema) });
+
+  async function requestCode(values: ForgotPasswordInput) {
+    setBusy(true);
+    setOtpError(null);
+    const result = await sendRecoveryOtp(values.email);
+    setBusy(false);
     if (!result.ok) {
       setError("root", { message: result.error });
       return;
     }
-    setSent(true);
+    setEmail(values.email);
+    setStep("otp");
   }
 
-  if (sent) {
+  async function confirmOtp(token: string) {
+    setBusy(true);
+    setOtpError(null);
+    const result = await verifyRecoveryOtp({ email, token });
+    setBusy(false);
+    if (!result.ok) {
+      setOtpError(result.error);
+      return;
+    }
+    setStep("new-password");
+  }
+
+  async function resend() {
+    setResending(true);
+    setOtpError(null);
+    const result = await sendRecoveryOtp(email);
+    setResending(false);
+    if (!result.ok) setOtpError(result.error);
+  }
+
+  async function submitNewPassword(values: ResetPasswordInput) {
+    setBusy(true);
+    const result = await updatePassword(values.password);
+    setBusy(false);
+    if (!result.ok) {
+      resetForm.setError("root", { message: result.error });
+      return;
+    }
+    setDone(true);
+    window.setTimeout(() => router.push("/login"), 1500);
+  }
+
+  if (step === "otp") {
     return (
-      <div className="rounded-lg border border-line bg-surface p-5 shadow-xs">
-        <h2 className="font-display text-h3 text-ink">Check your email</h2>
-        <p className="mt-2 text-body text-ink-muted">
-          If an account exists for that address, we have sent a link to reset your
-          password. The link is valid for one hour.
+      <OtpStep
+        email={email}
+        onSubmit={confirmOtp}
+        onResend={resend}
+        onBack={() => setStep("form")}
+        error={otpError}
+        verifying={busy}
+        resending={resending}
+      />
+    );
+  }
+
+  if (step === "new-password") {
+    if (done) {
+      return (
+        <p
+          role="status"
+          className="rounded-md border border-success-bg bg-success-bg px-3 py-2.5 text-small text-success"
+        >
+          Your password has been updated. Taking you to sign in…
         </p>
-        <p className="mt-3 text-small text-ink-subtle">
-          We show this same message for any address, so nobody can use this form
-          to find out who shops with us.
+      );
+    }
+
+    return (
+      <form onSubmit={resetForm.handleSubmit(submitNewPassword)} noValidate>
+        {resetForm.formState.errors.root ? (
+          <p
+            role="alert"
+            className="mb-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
+          >
+            {resetForm.formState.errors.root.message}
+          </p>
+        ) : null}
+
+        <p className="mb-4 text-small text-ink-muted">
+          We have verified your email. Choose a new password.
         </p>
-      </div>
+
+        <Field
+          label="New password"
+          htmlFor="fp-new-password"
+          error={resetForm.formState.errors.password?.message}
+          hint="At least 8 characters."
+          required
+        >
+          <Input
+            id="fp-new-password"
+            type="password"
+            autoComplete="new-password"
+            autoFocus
+            invalid={Boolean(resetForm.formState.errors.password)}
+            {...resetForm.register("password")}
+          />
+        </Field>
+
+        <Field
+          label="Confirm new password"
+          htmlFor="fp-confirm-password"
+          error={resetForm.formState.errors.confirmPassword?.message}
+          required
+        >
+          <Input
+            id="fp-confirm-password"
+            type="password"
+            autoComplete="new-password"
+            invalid={Boolean(resetForm.formState.errors.confirmPassword)}
+            {...resetForm.register("confirmPassword")}
+          />
+        </Field>
+
+        <Button
+          type="submit"
+          block
+          size="lg"
+          loading={busy}
+          loadingLabel="Updating…"
+        >
+          Update password
+        </Button>
+      </form>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate>
+    <form onSubmit={handleSubmit(requestCode)} noValidate>
       {errors.root ? (
         <p
           role="alert"
@@ -674,8 +930,8 @@ export function ForgotPasswordForm() {
         />
       </Field>
 
-      <Button type="submit" block size="lg" loading={isSubmitting} loadingLabel="Sending link…">
-        Send reset link
+      <Button type="submit" block size="lg" loading={isSubmitting || busy} loadingLabel="Sending code…">
+        Send code
       </Button>
     </form>
   );

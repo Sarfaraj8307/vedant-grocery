@@ -45,9 +45,13 @@ export async function createComplaint(input: {
     .single();
 
   if (error || !data) {
+    // Surface the real database error (RLS denial, constraint violation, etc.)
+    // so the failure is diagnosable instead of an opaque generic message.
     return {
       ok: false,
-      error: "We could not send that message. Please try again in a moment.",
+      error: error
+        ? `We could not send that message (${error.code ?? "error"}). Please try again in a moment.`
+        : "We could not send that message. Please try again in a moment.",
     };
   }
   return { ok: true, data: (data as { id: string }).id };
@@ -103,7 +107,12 @@ export async function replyToComplaint(
     .single();
 
   if (error || !data) {
-    return { ok: false, error: "We could not send that reply. Please try again." };
+    return {
+      ok: false,
+      error: error
+        ? `We could not send that reply (${error.code ?? "error"}). Please try again.`
+        : "We could not send that reply. Please try again.",
+    };
   }
   return { ok: true, data: data as ComplaintMessageRow };
 }
