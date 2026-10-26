@@ -8,6 +8,7 @@ import { SectionHeading } from "@/components/ui/misc";
 import { getAuthProviderCapabilities } from "@/lib/auth-providers";
 import { getSessionUser } from "@/lib/auth";
 import { store } from "@/config/store";
+import { getStoreContact } from "@/lib/store-contact";
 
 export const metadata: Metadata = {
   title: "Contact the store",
@@ -30,8 +31,14 @@ export default async function ContactPage() {
     getAuthProviderCapabilities(),
   ]);
 
-  const phone = store.phone;
-  const whatsapp = store.whatsapp;
+  // Prefer the owner-published numbers from `store_settings`; env config is the
+  // fallback when the DB row has no number.
+  const published = await getStoreContact().catch(() => ({
+    phone: store.phone,
+    whatsapp: store.whatsapp,
+  }));
+  const phone = published.phone ?? store.phone;
+  const whatsapp = published.whatsapp ?? store.whatsapp;
 
   return (
     <div className="shell flex flex-col gap-8 py-6 sm:py-8">
@@ -53,15 +60,11 @@ export default async function ContactPage() {
           }
         >
           {phone ? (
-            <CallStoreButton variant="secondary" />
+            <CallStoreButton variant="secondary" phone={phone} />
           ) : (
             <ConfigNote>
-              The owner needs to set{" "}
-              <code className="rounded-xs bg-surface-muted px-1 py-0.5 text-[11px]">
-                NEXT_PUBLIC_STORE_PHONE
-              </code>{" "}
-              (or expose it from the store settings) for the call button to
-              appear here.
+              The owner needs to publish a phone number in the store settings for
+              the call button to appear here.
             </ConfigNote>
           )}
         </ChannelCard>
@@ -77,14 +80,11 @@ export default async function ContactPage() {
           }
         >
           {whatsapp ? (
-            <WhatsAppButton variant="outline" />
+            <WhatsAppButton variant="outline" whatsapp={whatsapp} />
           ) : (
             <ConfigNote>
-              Set{" "}
-              <code className="rounded-xs bg-surface-muted px-1 py-0.5 text-[11px]">
-                NEXT_PUBLIC_STORE_WHATSAPP
-              </code>{" "}
-              to enable one-tap chat with the shop.
+              The owner needs to publish a WhatsApp number in the store settings to
+              enable one-tap chat with the shop.
             </ConfigNote>
           )}
         </ChannelCard>
@@ -146,7 +146,7 @@ export default async function ContactPage() {
             ? "Whichever is easier for you."
             : "Direct calling and WhatsApp are not enabled yet, so in-app messages are the reliable route at the moment."}
         </p>
-        <ContactPanel />
+        <ContactPanel phone={phone} whatsapp={whatsapp} />
       </section>
 
       {!providers.google ? (

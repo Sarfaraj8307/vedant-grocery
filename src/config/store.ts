@@ -50,7 +50,7 @@ export type StoreConfig = {
   readonly needsOwnerConfiguration: boolean;
 };
 
-function normaliseDial(raw: string | undefined): StoreContactChannel | null {
+export function normaliseDial(raw: string | undefined): StoreContactChannel | null {
   const value = raw?.trim();
   if (!value) return null;
   // Strip everything that cannot be part of a dial string.

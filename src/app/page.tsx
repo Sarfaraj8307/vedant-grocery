@@ -23,6 +23,7 @@ import { getDeliveryLocation } from "@/lib/addresses";
 import { BUY_AGAIN_COUNT, CATALOGUE_PREVIEW_COUNT, POPULAR_COUNT } from "@/config/catalogue";
 import { site } from "@/config/site";
 import { store } from "@/config/store";
+import { getStoreContact } from "@/lib/store-contact";
 
 export const metadata: Metadata = {
   title: site.defaultTitle,
@@ -56,6 +57,15 @@ export default async function HomePage() {
       })),
       getDeliveryLocation().catch(() => null),
     ]);
+
+  // Contact channels maintained by the owner in `store_settings`; the env config
+  // is the fallback when the DB has no number published.
+  const contact = await getStoreContact().catch(() => ({
+    phone: store.phone,
+    whatsapp: store.whatsapp,
+  }));
+  const contactPhone = contact.phone ?? store.phone;
+  const contactWhatsapp = contact.whatsapp ?? store.whatsapp;
 
   const counts = products.reduce<Record<string, number>>((acc, product) => {
     acc[product.category_id] = (acc[product.category_id] ?? 0) + 1;
@@ -179,7 +189,7 @@ export default async function HomePage() {
                 request.
               </p>
               <div className="mt-5">
-                <ContactPanel />
+                <ContactPanel phone={contactPhone} whatsapp={contactWhatsapp} />
               </div>
             </div>
 
