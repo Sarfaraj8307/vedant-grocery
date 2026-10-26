@@ -1,0 +1,44 @@
+name: Deploy to Cloudflare Workers
+
+# On every push to the default branch, build the site with OpenNext and deploy
+# it to Cloudflare Workers. This is what makes a `git push` immediately go live
+# on vedantfreshmart.in (once the Worker's custom domain is bound in the
+# Cloudflare dashboard).
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: deploy-cf
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build + deploy Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build with OpenNext for Cloudflare
+        # NEXT_PUBLIC_* are inlined at build time (they ship in the browser
+        # bundle), so they are supplied here — never at runtime.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+        run: pnpm exec opennextjs-cloudflare build
+      - name: Deploy to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: "67680667f522f48867a7762caf959677"
+        run: pnpm exec wrangler deploy
+      - name: Announce deployment
+        if: always()
+        run: echo "Deploy job finished (build+deploy)."
