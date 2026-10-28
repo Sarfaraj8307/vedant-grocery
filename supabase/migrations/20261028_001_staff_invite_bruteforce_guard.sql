@@ -25,6 +25,8 @@
 -- change. Errors still use SQLSTATE 22023.
 -- =============================================================================
 
+begin;
+
 alter table public.admin_invites
     add column if not exists failed_attempts integer not null default 0;
 alter table public.admin_invites
@@ -136,3 +138,5 @@ $function$;
 -- different search_path cannot quietly drop the invitee's access.
 revoke all on function public.verify_staff_otp(text, text) from public;
 grant execute on function public.verify_staff_otp(text, text) to anon, authenticated;
+
+commit;
