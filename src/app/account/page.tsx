@@ -4,6 +4,7 @@ import { Bell, CheckCircle2, FileText, HeadphonesIcon, MapPin, ReceiptText, Shie
 
 import { ChangePasswordForm } from "@/components/account/change-password-form";
 import { ProfileForm } from "@/components/account/profile-form";
+import { SessionsPanel } from "@/components/account/sessions-panel";
 import { SignOutButton } from "@/components/account/sign-out-dialog";
 import { UserAvatar } from "@/components/account/user-avatar";
 import { requireUser, getProfile } from "@/lib/auth";
@@ -50,15 +51,19 @@ export default async function AccountPage({
   const profile = await getProfile();
 
   const supabase = await getSupabaseServerClient();
-  const [{ count: addressCount }, { data: recentOrders }, consent] = await Promise.all([
-    supabase.from("addresses").select("id", { count: "exact", head: true }),
-    supabase
-      .from("orders")
-      .select("*")
-      .order("placed_at", { ascending: false })
-      .limit(3),
-    getConsentState(user.id),
-  ]);
+  const [{ count: addressCount }, { data: recentOrders }, consent, { data: sessionData }] =
+    await Promise.all([
+      supabase.from("addresses").select("id", { count: "exact", head: true }),
+      supabase
+        .from("orders")
+        .select("*")
+        .order("placed_at", { ascending: false })
+        .limit(3),
+      getConsentState(user.id),
+      // Local cookie read, not a network call — used only to tell the customer
+      // whether the session on this device is currently valid.
+      supabase.auth.getSession(),
+    ]);
 
   const orders = (recentOrders ?? []) as OrderRow[];
   const displayName =
@@ -175,6 +180,32 @@ export default async function AccountPage({
         </p>
         <div className="mt-4 max-w-lg">
           <ChangePasswordForm />
+        </div>
+      </section>
+
+      {/* Sessions — how this account signs in, and the one control that matters
+          when a device is lost. See the component for why it does not claim to
+          list individual devices. */}
+      <section
+        aria-labelledby="sessions-heading"
+        className="rounded-lg border border-line bg-surface p-4 shadow-xs sm:p-5"
+      >
+        <h2 id="sessions-heading" className="font-display text-h3 text-ink">
+          Your session
+        </h2>
+        <p className="mt-1 text-small text-ink-muted">
+          How you are signed in, and how to end it everywhere at once.
+        </p>
+        <div className="mt-4 max-w-lg">
+          <SessionsPanel
+            provider={user.provider}
+            lastSignInAt={user.lastSignInAt}
+            sessionRenewsAt={
+              sessionData.session?.expires_at
+                ? new Date(sessionData.session.expires_at * 1000).toISOString()
+                : null
+            }
+          />
         </div>
       </section>
 

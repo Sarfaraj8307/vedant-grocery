@@ -146,6 +146,53 @@ You need an inbox you can read.
 6. Repeat with the *same* email from `/signup`: it must sign the customer in and
    must **not** change their password.
 
+## Attempt limiting — what it does and does not protect
+
+`src/lib/otp-attempts.ts` burns the **code**, not the account: after five wrong
+codes the current code is unusable and the customer requests a new one, which
+resets the budget. There is also a one-hour ceiling so someone who cannot receive
+email is never stuck behind a dead form. The record is per email (hashed), kept in
+`localStorage`, and read through `useSyncExternalStore` so a reload shows the real
+state without a hydration mismatch.
+
+**This is not the security boundary, and it should not be sold as one.** The
+browser calls Supabase Auth directly, so an attacker who skips this page can call
+the same endpoint with `curl` and never touch this counter. It exists so honest
+customers get a clear stop instead of hammering a dead code, and so the easy path
+is also the bounded one.
+
+The control that actually bounds a scripted attack is Supabase's own per-user
+verification rate limit plus the one-hour code expiry. Those live in the
+dashboard, not in this repository:
+
+| Setting | Where | Suggested value |
+|---|---|---|
+| OTP expiry | Authentication → Providers → Email | 3600 s (the UI copy says "about an hour") |
+| Email OTP verification attempts | Authentication → Rate Limits | 5–10 per hour per user |
+| Email send rate | Authentication → Rate Limits | as low as the mailer tolerates |
+| JWT expiry | Authentication → Sessions | 3600 s |
+
+With six digits and a five-attempt ceiling per code, guessing inside one code's
+lifetime is a ~0.0005% chance; the limiter is what keeps it there.
+
+## Sessions
+
+`@supabase/ssr` already writes cookies with a 400-day lifetime and `proxy.ts`
+refreshes the session on every navigation, so a customer stays signed in without
+being asked for a password again — that part needed no change.
+
+The account page (`/account` → "Your session") shows how the account signs in,
+when it last signed in, and offers **Sign out of all devices**, which calls
+`signOut({ scope: "global" })` and revokes every refresh token.
+
+It deliberately does **not** list individual devices. Supabase does not expose a
+per-device session list to a publishable key, and a security panel showing
+plausible but invented sessions is worse than no panel.
+
+To cap a session at one month — so a customer is asked for credentials again after
+30 days — set **Authentication → Sessions → Time-box user sessions** to 30 days.
+That is a dashboard setting; nothing in this repository can enforce it.
+
 ## Known limitations
 
 - **Email delivery is not observable from here.** `mailer_autoconfirm` is

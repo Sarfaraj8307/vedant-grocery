@@ -16,6 +16,17 @@ import { OtpInput } from "@/components/auth/otp-input";
 import { PasswordInput } from "@/components/auth/password-input";
 import { isCompleteOtp } from "@/lib/otp";
 import {
+  attemptsLeft,
+  attemptsSnapshot,
+  clearAttempts,
+  EMPTY_ATTEMPTS,
+  formatLockRemaining,
+  isLocked,
+  registerFailure,
+  subscribeAttempts,
+  writeAttempts,
+} from "@/lib/otp-attempts";
+import {
   forgotPasswordSchema,
   resetPasswordSchema,
   signInSchema,
@@ -290,7 +301,8 @@ function OtpStep({
 }: {
   email: string;
   submitLabel?: string;
-  onSubmit: (token: string) => void | Promise<void>;
+  /** Resolve `true` only when the code was accepted. */
+  onSubmit: (token: string) => Promise<boolean>;
   /** Resolve `true` only when a new code was actually sent. */
   onResend: () => Promise<boolean>;
   onChangeEmail: () => void;
@@ -300,10 +312,28 @@ function OtpStep({
 }) {
   const [token, setToken] = React.useState("");
   const [cooldown, setCooldown] = React.useState(RESEND_COOLDOWN_SECONDS);
+  const [now, setNow] = React.useState(() => Date.now());
   // Guards against a double submit from a double click or an impatient
   // Enter key while the first request is still in flight.
   const submitting = React.useRef(false);
-  const complete = isCompleteOtp(token);
+
+  // The record follows the address, so switching email starts from a clean
+  // slate and a second account is never punished for the first one. Read
+  // through an external store so a reload shows the real state without a
+  // hydration mismatch (see lib/otp-attempts).
+  const attempts = React.useSyncExternalStore(
+    React.useCallback((onChange: () => void) => subscribeAttempts(email, onChange), [email]),
+    React.useCallback(() => attemptsSnapshot(email), [email]),
+    React.useCallback(() => EMPTY_ATTEMPTS, []),
+  );
+
+  // While the code is burned, keep the clock moving so the countdown is honest
+  // and the form unlocks by itself the moment the lock expires.
+  React.useEffect(() => {
+    if (!isLocked(attempts, now)) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [attempts, now]);
 
   React.useEffect(() => {
     if (cooldown <= 0) return;
@@ -311,12 +341,25 @@ function OtpStep({
     return () => window.clearTimeout(timer);
   }, [cooldown]);
 
+  const locked = isLocked(attempts, now);
+  const remaining = attemptsLeft(attempts, now);
+  const complete = isCompleteOtp(token);
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!complete || verifying || submitting.current) return;
+    if (!complete || verifying || submitting.current || locked) return;
     submitting.current = true;
     try {
-      await onSubmit(token);
+      const accepted = await onSubmit(token);
+      if (accepted) {
+        clearAttempts(email);
+        return;
+      }
+      // Wrong code: burn one attempt and empty the boxes so the next try
+      // starts clean rather than sitting on six known-wrong digits.
+      writeAttempts(email, registerFailure(attempts, Date.now()));
+      setNow(Date.now());
+      setToken("");
     } finally {
       submitting.current = false;
     }
@@ -325,7 +368,13 @@ function OtpStep({
   async function handleResend() {
     if (resending || cooldown > 0) return;
     const sent = await onResend();
-    if (sent) setCooldown(RESEND_COOLDOWN_SECONDS);
+    if (!sent) return;
+    // A fresh code is a fresh budget — that is the whole point of "burn the
+    // code, not the account".
+    clearAttempts(email);
+    setToken("");
+    setNow(Date.now());
+    setCooldown(RESEND_COOLDOWN_SECONDS);
   }
 
   return (
@@ -340,7 +389,20 @@ function OtpStep({
         <p className="mt-0.5 break-all font-medium text-ink">{email}</p>
       </div>
 
-      {error ? (
+      {locked ? (
+        <div
+          role="alert"
+          className="mt-3 rounded-md border border-marigold-200 bg-marigold-50 px-3 py-2.5 text-small"
+        >
+          <p className="font-medium text-ink">Too many incorrect codes</p>
+          <p className="mt-1 text-ink-muted">
+            This code can no longer be used. Request a new one to continue
+            {formatLockRemaining(attempts, now)
+              ? ` — or wait ${formatLockRemaining(attempts, now)}.`
+              : "."}
+          </p>
+        </div>
+      ) : error ? (
         <p
           role="alert"
           className="mt-3 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
@@ -351,17 +413,25 @@ function OtpStep({
 
       <form className="mt-5" onSubmit={handleSubmit} noValidate>
         <p id="otp-instructions" className="mb-3 text-center text-small text-ink-muted">
-          Enter the code below. It expires in about an hour.
+          {locked
+            ? "Request a new code above to try again."
+            : "Enter the code below. It expires in about an hour."}
         </p>
 
         <OtpInput
           value={token}
           onChange={setToken}
-          disabled={verifying}
-          invalid={Boolean(error)}
+          disabled={verifying || locked}
+          invalid={Boolean(error) && !locked}
           describedBy="otp-instructions"
           autoFocus
         />
+
+        {!locked && remaining <= 2 ? (
+          <p className="mt-2 text-center text-small text-marigold-700" role="status">
+            {remaining === 1 ? "1 attempt left" : `${remaining} attempts left`}
+          </p>
+        ) : null}
 
         <Button
           type="submit"
@@ -370,7 +440,7 @@ function OtpStep({
           className={authSubmitClass + " mt-5"}
           loading={verifying}
           loadingLabel="Verifying…"
-          disabled={!complete}
+          disabled={!complete || locked}
         >
           {submitLabel}
         </Button>
@@ -379,7 +449,7 @@ function OtpStep({
       <div className="mt-4 flex flex-col items-center gap-2 text-small">
         <p className="text-ink-muted">
           Didn&rsquo;t get it?{" "}
-          {cooldown > 0 ? (
+          {cooldown > 0 && !locked ? (
             <span className="text-ink-subtle">Resend in {cooldown}s</span>
           ) : (
             <button
@@ -388,7 +458,7 @@ function OtpStep({
               disabled={resending}
               className="font-medium text-leaf-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-ink-subtle"
             >
-              {resending ? "Sending…" : "Resend code"}
+              {resending ? "Sending…" : "Send a new code"}
             </button>
           )}
         </p>
@@ -547,7 +617,7 @@ export function SignUpForm({
     setStep("otp");
   }
 
-  async function confirmOtp(token: string) {
+  async function confirmOtp(token: string): Promise<boolean> {
     setVerifyingOtp(true);
     setOtpError(null);
 
@@ -559,7 +629,7 @@ export function SignUpForm({
     if (!result.ok) {
       setOtpError(result.error);
       setVerifyingOtp(false);
-      return;
+      return false;
     }
 
     // The address already had an account, so this code was a sign-in rather
@@ -568,7 +638,7 @@ export function SignUpForm({
     if (result.data.existingAccount) {
       router.push(next);
       router.refresh();
-      return;
+      return true;
     }
 
     // A brand-new account: apply the password chosen on the form so they can
@@ -583,6 +653,7 @@ export function SignUpForm({
 
     router.push(next);
     router.refresh();
+    return true;
   }
 
   async function resendOtp(): Promise<boolean> {
@@ -836,16 +907,17 @@ export function ForgotPasswordForm() {
     setStep("otp");
   }
 
-  async function confirmOtp(token: string) {
+  async function confirmOtp(token: string): Promise<boolean> {
     setBusy(true);
     setOtpError(null);
     const result = await verifyRecoveryOtp({ email, token });
     setBusy(false);
     if (!result.ok) {
       setOtpError(result.error);
-      return;
+      return false;
     }
     setStep("new-password");
+    return true;
   }
 
   async function resend(): Promise<boolean> {

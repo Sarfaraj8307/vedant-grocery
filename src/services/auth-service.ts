@@ -534,6 +534,24 @@ export async function signOut(): Promise<AuthResult> {
   return { ok: true, data: undefined };
 }
 
+/**
+ * Sign out of every device, not just this one.
+ *
+ * `scope: "global"` revokes every refresh token issued for the account, so a
+ * session left open on a shared or lost device stops renewing. The access token
+ * already handed to that device stays valid until it expires (an hour), which
+ * is a property of JWTs rather than of this call — the short lifetime is what
+ * bounds it, and is why Supabase's own guidance is to keep JWT expiry low.
+ */
+export async function signOutEverywhere(): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase.auth.signOut({ scope: "global" });
+  if (error) {
+    return { ok: false, error: friendlyAuthError(error.message, error.code) };
+  }
+  return { ok: true, data: undefined };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Terms consent                                                              */
 /* -------------------------------------------------------------------------- */

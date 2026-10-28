@@ -27,6 +27,10 @@ export type SessionUser = {
   lastName: string;
   /** Provider picture (Google), when the provider supplied one. */
   avatarUrl: string | null;
+  /** ISO timestamp of the most recent successful sign-in. */
+  lastSignInAt: string | null;
+  /** `email`, `google`, … — how this account signs in. */
+  provider: string;
 };
 
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -48,6 +52,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     firstName: fields.firstName,
     lastName: fields.lastName,
     avatarUrl: avatarUrlFromMetadata(meta),
+    lastSignInAt: user.last_sign_in_at ?? null,
+    provider: String(user.app_metadata?.provider ?? "email"),
   };
 }
 
