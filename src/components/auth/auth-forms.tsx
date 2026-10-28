@@ -381,7 +381,7 @@ function OtpStep({
     <div>
       <h2 className="font-display text-h2 text-ink">Verify your email</h2>
       <p className="mt-1.5 text-small text-ink-muted">
-        We&rsquo;ve sent a 6-digit verification code to your email address.
+        We&rsquo;ve sent a verification email to your email address.
       </p>
 
       <div className="mt-4 rounded-xl border border-line bg-surface-muted px-3.5 py-3 text-small">
@@ -415,7 +415,7 @@ function OtpStep({
         <p id="otp-instructions" className="mb-3 text-center text-small text-ink-muted">
           {locked
             ? "Request a new code above to try again."
-            : "Enter the code below. It expires in about an hour."}
+            : "Enter the 6-digit code from that email. It expires in about an hour."}
         </p>
 
         <OtpInput
@@ -470,6 +470,17 @@ function OtpStep({
         >
           Change email address
         </button>
+        {/*
+          The Supabase email template on the free tier renders a link and no
+          code (templates are locked until a custom SMTP provider is set up —
+          see docs/AUTH_OTP.md). Without this line those customers sit on a form
+          with nothing to type, so the link is offered as the fallback rather
+          than pretending it does not exist.
+        */}
+        <p className="mt-1 text-center text-ink-subtle">
+          Email shows a button instead of a code? Open it — that verifies you straight
+          away.
+        </p>
       </div>
     </div>
   );

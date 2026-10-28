@@ -71,75 +71,77 @@ If it is wrong, `emailRedirectTo` and the post-callback redirect point at the
 wrong host — that is how a `*.vercel.app` or `localhost:3000` URL would leak into
 an email.
 
-## Supabase dashboard — required, cannot be done from this repository
+## Supabase configuration — current state
 
-There is no management token in this workspace, so these three steps must be
-done by the project owner.
+Applied via the Management API on 2026-10-28 and read back to confirm.
 
-### 1. Authentication → URL Configuration
+| Setting | Before | Now |
+|---|---|---|
+| **Site URL** | `https://vedant-grocery.vercel.app` | `https://vedantfreshmart.in` |
+| **Redirect URLs** | only `*.vercel.app` + localhost | `https://vedantfreshmart.in/**`, `https://vedantfreshmart.in`, `http://localhost:3000/**` |
+| **OTP length** | `8` | `6` (matches the six boxes) |
+| **Verify rate limit** | `30`/hour | `10`/hour |
 
-| Field | Value |
-|---|---|
-| **Site URL** | `https://vedantfreshmart.in` |
-| **Redirect URLs** | `https://vedantfreshmart.in/**`<br>`https://vedantfreshmart.in`<br>`http://localhost:3000/**` (local development only) |
+The Site URL was the "Vercel redirect" bug: every `emailRedirectTo` was silently
+rewritten to the old Vercel host because the apex domain was not in the allowlist.
+The OTP length was the other half — Supabase was minting **8-digit** codes for a UI
+that accepts six.
 
-The `/**` suffix matters: `emailRedirectTo` targets `/auth/callback`, and a bare
-host entry does not match a path.
+### Still blocked by the plan
 
-`www.vedantfreshmart.in` redirects to the apex domain, so the apex is the only
-host that needs to be listed.
+Two settings cannot be changed on this project as it stands. Both were attempted
+and rejected by the API:
 
-### 2. Authentication → Email Templates — **this is the step that turns the flow on**
+| Setting | Error | Unblocks with |
+|---|---|---|
+| **Email templates** (add `{{ .Token }}`) | *"Email template modification is not available for free tier projects using the default email provider."* | A custom SMTP provider, or a Pro plan |
+| **Time-box user sessions** (the one-month cap) | *"User sessions can only be configured on Pro Plans and up."* | Pro plan |
 
-By default Supabase's templates contain `{{ .ConfirmationURL }}` and no code. If
-these are left alone, the customer receives a link, the six boxes never have
-anything to verify, and the flow is dead.
+**Until custom SMTP is configured, the emailed code does not exist** — the
+default template renders only `{{ .ConfirmationURL }}`. The signup screen
+therefore tells the customer they can either type the code or open the link, and
+the link path (via `/auth/callback`) signs them in. A customer who arrives that
+way has no password set, because the password is applied only after a code is
+verified; they can set one through "Forgot password".
 
-**Confirm signup** — subject `Your Vedant Fresh Mart verification code`:
+The moment SMTP is configured, put this in the three templates (Confirm signup,
+Magic Link, Reset Password) and the code path takes over with no code change:
 
 ```html
 <h2>Vedant Fresh Mart</h2>
 <p>Your verification code is:</p>
-<p style="font-size:28px;font-weight:700;letter-spacing:6px">{{ .Token }}</p>
-<p>Enter this code on Vedant Fresh Mart to verify your email.</p>
+<p style="font-size:30px;font-weight:700;letter-spacing:8px;margin:18px 0">{{ .Token }}</p>
+<p>Enter this code on vedantfreshmart.in to continue.</p>
 ```
 
-**Magic Link** — same body. This is the template used when an address already has
-an account, so it must also carry the code.
+### Providers → Email
 
-**Reset Password** — subject `Your Vedant Fresh Mart password reset code`:
+Email is enabled and **"Confirm email" is on** (`mailer_autoconfirm = false`,
+confirmed via `/auth/v1/settings`). Turning it off would make `signInWithOtp`
+skip verification entirely.
 
-```html
-<h2>Vedant Fresh Mart</h2>
-<p>Your password reset code is:</p>
-<p style="font-size:28px;font-weight:700;letter-spacing:6px">{{ .Token }}</p>
-<p>Enter this code on Vedant Fresh Mart to choose a new password.</p>
-<p>If you did not ask for this, you can ignore this email.</p>
-```
+### Custom SMTP is the real unblock
 
-`{{ .Token }}` is the six-digit code. `{{ .ConfirmationURL }}` is the clickable
-link — it must **not** be the only thing in the email.
+Everything still missing traces to one thing: the project uses Supabase's built-in
+mailer, which is capped at **2 emails per hour** and, on the free tier, locks the
+template editor. Configuring Authentication → Emails → SMTP Settings with any
+transactional provider (Resend, Brevo, Zoho, a Workspace mailbox) fixes all of it
+at once:
 
-### 3. Authentication → Providers → Email
-
-Email must be enabled and **"Confirm email" must stay on**. Turning it off would
-make `signInWithOtp` skip the code entirely.
-
-### Optional: custom SMTP
-
-The built-in Supabase mailer is heavily rate-limited and is intended for testing.
-For real customer volume, configure Authentication → Emails → SMTP Settings with
-a transactional provider, or OTP delivery will start failing under load with
-`email rate limit exceeded`.
+- the template editor unlocks, so `{{ .Token }}` can be added;
+- the 2/hour cap goes away, so "Send a new code" actually works more than once;
+- delivery stops being best-effort.
 
 ## How to verify the flow end to end
 
 You need an inbox you can read.
 
 1. Sign up at `https://vedantfreshmart.in/signup` with that address.
-2. The email must show **six digits**, not a link. If it shows a link, step 2
-   above has not been applied.
-3. Enter the digits — a wrong code shows "That code is invalid or has expired".
+2. Today the email shows a **link**, because the template editor is locked until
+   custom SMTP exists. Opening it must land on `vedantfreshmart.in` — not
+   `*.vercel.app` — and sign the customer in.
+3. Once SMTP is configured the email must show **six digits**; then enter them,
+   and a wrong code shows "That code is invalid or has expired".
 4. After verifying, the browser lands on `/` signed in; reload and the session
    survives.
 5. Sign out, then sign in with the same email and password.
@@ -191,14 +193,21 @@ plausible but invented sessions is worse than no panel.
 
 To cap a session at one month — so a customer is asked for credentials again after
 30 days — set **Authentication → Sessions → Time-box user sessions** to 30 days.
-That is a dashboard setting; nothing in this repository can enforce it.
+That is a dashboard setting, and it is **Pro-plan only** (the API rejected it on
+this project with *"User sessions can only be configured on Pro Plans and up."*),
+so nothing here can enforce it today.
 
 ## Known limitations
 
-- **Email delivery is not observable from here.** `mailer_autoconfirm` is
-  `false` and the email provider is enabled (confirmed via
-  `/auth/v1/settings`), but whether the template contains `{{ .Token }}` can only
-  be checked in the dashboard.
+- **The emailed code does not exist yet.** The template editor is locked on the
+  free tier without custom SMTP, so the default template still renders only a
+  link. The OTP screen says so and offers the link as the fallback.
+- **A link-verified customer has no password**, because the password is applied
+  only after a code is verified. They set one via "Forgot password".
+- **Email delivery is capped at 2 per hour** by the built-in mailer, so "Send a
+  new code" can fail with `email rate limit exceeded` until SMTP is configured.
+- **Sessions cannot be time-boxed on the free tier**, so the one-month cap is not
+  active. Sessions otherwise persist and refresh correctly.
 - **Recovery codes reuse the OTP screen** but not the signup guard: a recovery
   code always resolves to an existing account, which is the point.
 - If `updateUser({ password })` fails after a successful verification the
