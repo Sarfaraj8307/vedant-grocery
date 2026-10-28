@@ -36,7 +36,11 @@ export default async function SignUpPage({
       subtitle={
         providers.emailAutoConfirm
           ? "You will be shopping in under a minute."
-          : "We will email you a 6-digit code to confirm your address."
+          : // Neutral on purpose: the email carries a code once a custom SMTP
+            // provider is configured, and a link until then (Supabase locks the
+            // template editor on the default mailer). Promising either one
+            // specifically would be wrong half the time.
+            "We will email you to confirm your address."
       }
       footer={
         <>
