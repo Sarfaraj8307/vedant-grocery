@@ -36,13 +36,22 @@ export function friendlyAuthError(message: string, code?: string): string {
     return "That email and password don't match. Check them and try again.";
   }
   if (text.includes("email not confirmed")) {
-    return "Please confirm your email first — open the link we sent you, then sign in.";
+    return "That email hasn't been verified yet. Sign up again to get a fresh 6-digit code, then sign in.";
+  }
+  if (text.includes("already confirmed")) {
+    return "That email is already verified. Please sign in instead.";
   }
   if (text.includes("user already registered") || code === "user_already_exists") {
     return "An account with this email already exists. Try signing in instead.";
   }
   if (text.includes("password should be at least")) {
     return "Please choose a password with at least 8 characters.";
+  }
+  if (text.includes("email rate limit exceeded")) {
+    return "We've sent several codes already. Please wait a few minutes before requesting another one.";
+  }
+  if (text.includes("for security purposes")) {
+    return "Please wait a few seconds before requesting another code.";
   }
   if (text.includes("rate limit") || text.includes("too many")) {
     return "Too many attempts. Please wait a minute and try again.";
@@ -53,16 +62,21 @@ export function friendlyAuthError(message: string, code?: string): string {
   if (text.includes("failed to fetch") || text.includes("network")) {
     return "We couldn't reach the server. Check your connection and try again.";
   }
+  // Supabase deliberately cannot distinguish a wrong code from an expired one
+  // ("Token has expired or is invalid"), so neither can we — guessing would
+  // tell an attacker which of the two they hit.
   if (
     text.includes("token has expired") ||
     text.includes("invalid token") ||
-    text.includes("otp") ||
     text.includes("code is invalid") ||
+    text.includes("token is invalid") ||
     code === "otp_expired" ||
-    code === "invalid_otp" ||
-    code === "otp_disabled"
+    code === "invalid_otp"
   ) {
     return "That code is invalid or has expired. Check the latest email and try again.";
+  }
+  if (code === "otp_disabled" || text.includes("otp is disabled")) {
+    return "Code sign-in isn't available right now. Please use your password instead.";
   }
   if (text.includes("provider is not enabled")) {
     return "That sign-in method isn't available right now. Please use email instead.";
@@ -219,29 +233,13 @@ export async function signInWithGoogle(nextPath = "/"): Promise<AuthResult> {
  */
 export function isEmailUnconfirmed(code?: string, message?: string): boolean {
   if (code === "email_not_confirmed") return true;
-  // The message may already be the friendly copy, which says "confirm your
-  // email", not the provider's "email not confirmed".
-  return /email not confirmed|confirm your email/.test((message ?? "").toLowerCase());
-}
-
-/**
- * Send a fresh confirmation link.
- *
- * Supabase rate-limits this endpoint, so the caller shows the provider's own
- * message rather than pretending it always worked.
- */
-export async function resendConfirmation(email: string): Promise<AuthResult> {
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase.auth.resend({
-    type: "signup",
-    email: email.trim(),
-    options: { emailRedirectTo: absoluteUrl("/auth/callback") },
-  });
-
-  if (error) {
-    return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
-  }
-  return { ok: true, data: undefined };
+  // The message may already be the friendly copy, which talks about the address
+  // not being verified rather than the provider's "email not confirmed". Both
+  // wordings have to match or a real failure falls through to a bare error with
+  // no way to request a fresh code.
+  return /email not confirmed|confirm your email|been verified/.test(
+    (message ?? "").toLowerCase(),
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -252,18 +250,28 @@ export async function resendConfirmation(email: string): Promise<AuthResult> {
  * Send a one-time password (OTP) code to an email address to verify a new
  * sign-up. `shouldCreateUser: true` creates an unconfirmed user carrying the
  * profile fields in `user_metadata`; the code itself confirms the account.
+ *
+ * The returned `sentAt` is the moment the request went out. It is handed back
+ * to `verifySignupOtp` so the two can tell a brand-new account (created by this
+ * very request) from an address that already had one.
  */
 export async function sendSignupOtp(input: {
   email: string;
   firstName: string;
   lastName: string;
   username: string;
-}): Promise<AuthResult> {
+}): Promise<AuthResult<{ sentAt: number }>> {
   const supabase = getSupabaseBrowserClient();
+  const sentAt = Date.now();
+
   const { error } = await supabase.auth.signInWithOtp({
     email: input.email.trim(),
     options: {
       shouldCreateUser: true,
+      // Only consulted if the project's email template still renders a link
+      // instead of a code. It keeps that fallback on the production domain
+      // rather than Supabase's default Site URL.
+      emailRedirectTo: absoluteUrl("/auth/callback"),
       data: {
         first_name: input.firstName.trim(),
         last_name: input.lastName.trim(),
@@ -278,7 +286,85 @@ export async function sendSignupOtp(input: {
   if (error) {
     return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
   }
-  return { ok: true, data: undefined };
+  return { ok: true, data: { sentAt } };
+}
+
+/**
+ * Send a replacement code for a sign-up that is still pending.
+ *
+ * Uses `resend({ type: "signup" })` rather than `signInWithOtp` again, so the
+ * replacement carries the **same token type** as the first code. Re-requesting
+ * through the OTP endpoint would issue a `magiclink` token for the account that
+ * the first request already created, and a `signup` verification would then
+ * reject it.
+ */
+export async function resendSignupOtp(input: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+}): Promise<AuthResult<{ sentAt: number }>> {
+  const supabase = getSupabaseBrowserClient();
+  const sentAt = Date.now();
+
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: input.email.trim(),
+    options: { emailRedirectTo: absoluteUrl("/auth/callback") },
+  });
+
+  if (!error) return { ok: true, data: { sentAt } };
+
+  // "User not found" means the first request never created the account (for
+  // example it failed after the rate limiter accepted it). Starting the signup
+  // again is the only way forward, and it is safe: nothing was created.
+  if (/user not found|no user/i.test(error.message)) {
+    return sendSignupOtp(input);
+  }
+
+  return { ok: false, error: friendlyAuthError(error.message, error.code), code: error.code };
+}
+
+/**
+ * Two minutes of slack when deciding whether an account pre-dates this sign-up.
+ *
+ * Absorbs clock skew between the browser and Supabase, and the round trip
+ * itself. Anything newer than this was almost certainly created by the request
+ * the customer just made.
+ */
+const EXISTING_ACCOUNT_SLACK_MS = 2 * 60_000;
+
+/**
+ * Was this account already on file before the customer asked for a code?
+ *
+ * WHY IT MATTERS: `signInWithOtp({ shouldCreateUser: true })` succeeds for an
+ * address that already has an account — it sends a sign-in code instead of a
+ * sign-up code. Without this check the signup form would happily take over an
+ * existing customer's account and **overwrite their password** with whatever
+ * was typed into the "password" box. Detecting it lets the caller sign them in
+ * and leave their credentials alone.
+ */
+export function isExistingAccount(
+  createdAt: string | null | undefined,
+  requestedAt: number | undefined,
+): boolean {
+  if (!createdAt || !requestedAt) return false;
+  const created = Date.parse(createdAt);
+  if (Number.isNaN(created)) return false;
+  return created < requestedAt - EXISTING_ACCOUNT_SLACK_MS;
+}
+
+/** True when a verify call failed because the code was wrong or too old. */
+function isTokenRejection(error: { message: string; code?: string }): boolean {
+  const text = error.message.toLowerCase();
+  return (
+    error.code === "otp_expired" ||
+    error.code === "invalid_otp" ||
+    text.includes("token has expired") ||
+    text.includes("invalid token") ||
+    text.includes("token is invalid") ||
+    text.includes("code is invalid")
+  );
 }
 
 /**
@@ -289,13 +375,29 @@ export async function sendSignupOtp(input: {
 export async function verifySignupOtp(input: {
   email: string;
   token: string;
-}): Promise<AuthResult<{ userId: string }>> {
+  /** `sentAt` from `sendSignupOtp`/`resendSignupOtp`. */
+  requestedAt?: number;
+}): Promise<AuthResult<{ userId: string; existingAccount: boolean }>> {
   const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase.auth.verifyOtp({
-    email: input.email.trim(),
-    token: input.token.trim(),
-    type: "signup",
-  });
+  const email = input.email.trim();
+  const token = input.token.trim();
+
+  // `signInWithOtp` issues a `signup` token for a brand-new address and a
+  // `magiclink` one for an address that already has an account. GoTrue's
+  // `email` type covers both, so it goes first; `signup` is retried only when
+  // the code itself was rejected, which is the one case where the type might be
+  // the reason. A rate-limit or network failure is never retried — that would
+  // just burn the verification attempt budget.
+  const primary = await supabase.auth.verifyOtp({ email, token, type: "email" });
+  let data = primary.data;
+  let error = primary.error;
+
+  if (error && isTokenRejection(error)) {
+    const fallback = await supabase.auth.verifyOtp({ email, token, type: "signup" });
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error || !data.user) {
     const message = error
       ? friendlyAuthError(error.message, error.code)
@@ -312,7 +414,13 @@ export async function verifySignupOtp(input: {
   });
   await insertAcceptance(data.user.id, "signup");
 
-  return { ok: true, data: { userId: data.user.id } };
+  return {
+    ok: true,
+    data: {
+      userId: data.user.id,
+      existingAccount: isExistingAccount(data.user.created_at, input.requestedAt),
+    },
+  };
 }
 
 /** Send a password-recovery OTP code. Does not create an account. */

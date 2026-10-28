@@ -36,7 +36,7 @@ export default async function SignUpPage({
       subtitle={
         providers.emailAutoConfirm
           ? "You will be shopping in under a minute."
-          : "We will email you a link to confirm your address."
+          : "We will email you a 6-digit code to confirm your address."
       }
       footer={
         <>

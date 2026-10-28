@@ -12,10 +12,11 @@ import { Checkbox } from "@/components/ui/menu";
 import { Field, Input } from "@/components/ui/input";
 import { OrDivider } from "@/components/auth/auth-shell";
 import { authInputClass, authSubmitClass } from "@/components/auth/auth-card";
+import { OtpInput } from "@/components/auth/otp-input";
 import { PasswordInput } from "@/components/auth/password-input";
+import { isCompleteOtp } from "@/lib/otp";
 import {
   forgotPasswordSchema,
-  otpTokenSchema,
   resetPasswordSchema,
   signInSchema,
   signUpSchema,
@@ -28,7 +29,7 @@ import {
 import {
   checkUsername,
   isEmailUnconfirmed,
-  resendConfirmation,
+  resendSignupOtp,
   sendRecoveryOtp,
   sendSignupOtp,
   signInWithGoogle,
@@ -134,12 +135,9 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
 
   /** Set only when the provider rejected the sign-in for an unconfirmed address. */
   const [unconfirmedEmail, setUnconfirmedEmail] = React.useState<string | null>(null);
-  const [resending, setResending] = React.useState(false);
-  const [resendNote, setResendNote] = React.useState<string | null>(null);
 
   async function onSubmit(values: SignInInput) {
     setUnconfirmedEmail(null);
-    setResendNote(null);
 
     const result = await signInWithPassword(values);
     if (!result.ok) {
@@ -151,20 +149,6 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
     }
     router.push(next);
     router.refresh();
-  }
-
-  async function resend() {
-    if (!unconfirmedEmail) return;
-    setResending(true);
-    setResendNote(null);
-
-    const result = await resendConfirmation(unconfirmedEmail);
-    setResending(false);
-    setResendNote(
-      result.ok
-        ? "Sent. Check your inbox — and the spam folder, just in case."
-        : result.error,
-    );
   }
 
   return (
@@ -241,36 +225,31 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
       </form>
 
       {/*
-        The requirement: an unconfirmed customer must be told to confirm, not
-        left with a generic failure. Offering the resend here is the difference
-        between a dead end and a fix — the original email may have expired or
-        never arrived.
+        An unconfirmed customer has no working password yet — the signup flow
+        only applies it *after* the code is verified — so "resend the
+        confirmation link" would be a dead end: the email now carries a code and
+        this page has nowhere to type it. Send them to the sign-up page, which
+        re-issues a code and lets them finish.
       */}
       {unconfirmedEmail ? (
         <div
           role="alert"
           className="mt-4 rounded-md border border-marigold-200 bg-marigold-50 px-3 py-3"
         >
-          <p className="text-small font-medium text-ink">Please confirm your email first</p>
+          <p className="text-small font-medium text-ink">Please verify your email first</p>
           <p className="mt-1 text-small text-ink-muted">
-            We sent a confirmation link to{" "}
-            <span className="font-medium text-ink">{unconfirmedEmail}</span>. Open it
-            and you will be signed in automatically. If it has not arrived, we can
-            send another.
+            We sent a 6-digit code to{" "}
+            <span className="font-medium text-ink">{unconfirmedEmail}</span>. Enter it on
+            the sign-up page to finish setting up your account, then sign in here.
           </p>
-          {resendNote ? (
-            <p className="mt-2 text-small text-ink-muted">{resendNote}</p>
-          ) : null}
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="mt-2.5"
-            loading={resending}
-            loadingLabel="Sending…"
-            onClick={() => void resend()}
+            onClick={() => router.push("/signup")}
           >
-            Resend confirmation email
+            Verify my email
           </Button>
         </div>
       ) : null}
@@ -289,95 +268,137 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
 /* OTP step — shared by signup and password recovery                          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Seconds before a replacement code may be requested.
+ *
+ * Supabase's own mailer is rate-limited, so a customer who taps "resend" three
+ * times in ten seconds gets a "you can only request this after 47 seconds"
+ * error instead of a code. Holding the button for 30 seconds prevents that
+ * conversation entirely and is long enough for the first email to arrive.
+ */
+const RESEND_COOLDOWN_SECONDS = 30;
+
 function OtpStep({
   email,
-  title = "Enter the code we sent you",
-  buttonLabel = "Verify & continue",
+  submitLabel = "Verify code",
   onSubmit,
   onResend,
-  onBack,
+  onChangeEmail,
   error,
   verifying = false,
   resending = false,
 }: {
   email: string;
-  title?: string;
-  buttonLabel?: string;
-  onSubmit: (token: string) => void;
-  onResend: () => void;
-  onBack: () => void;
+  submitLabel?: string;
+  onSubmit: (token: string) => void | Promise<void>;
+  /** Resolve `true` only when a new code was actually sent. */
+  onResend: () => Promise<boolean>;
+  onChangeEmail: () => void;
   error?: string | null;
   verifying?: boolean;
   resending?: boolean;
 }) {
   const [token, setToken] = React.useState("");
-  const tokenError = otpTokenSchema.safeParse(token).success ? null : "Enter the 6-digit code";
+  const [cooldown, setCooldown] = React.useState(RESEND_COOLDOWN_SECONDS);
+  // Guards against a double submit from a double click or an impatient
+  // Enter key while the first request is still in flight.
+  const submitting = React.useRef(false);
+  const complete = isCompleteOtp(token);
+
+  React.useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown((left) => left - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!complete || verifying || submitting.current) return;
+    submitting.current = true;
+    try {
+      await onSubmit(token);
+    } finally {
+      submitting.current = false;
+    }
+  }
+
+  async function handleResend() {
+    if (resending || cooldown > 0) return;
+    const sent = await onResend();
+    if (sent) setCooldown(RESEND_COOLDOWN_SECONDS);
+  }
 
   return (
     <div>
-      <div className="rounded-md border border-line bg-surface-muted px-3.5 py-3 text-small">
-        <p className="text-ink-muted">We sent a code to</p>
-        <p className="mt-0.5 font-medium text-ink">{email}</p>
+      <h2 className="font-display text-h2 text-ink">Verify your email</h2>
+      <p className="mt-1.5 text-small text-ink-muted">
+        We&rsquo;ve sent a 6-digit verification code to your email address.
+      </p>
+
+      <div className="mt-4 rounded-xl border border-line bg-surface-muted px-3.5 py-3 text-small">
+        <p className="text-ink-muted">Sent to</p>
+        <p className="mt-0.5 break-all font-medium text-ink">{email}</p>
       </div>
 
       {error ? (
         <p
           role="alert"
-          className="mb-3 mt-3 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
+          className="mt-3 rounded-md border border-danger-bg bg-danger-bg px-3 py-2.5 text-small text-danger"
         >
           {error}
         </p>
       ) : null}
 
-      <form
-        className="mt-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (otpTokenSchema.safeParse(token).success) onSubmit(token.trim());
-        }}
-        noValidate
-      >
-        <Field label="One-time code" htmlFor="otp-code" error={token ?? tokenError}>
-          <Input
-            id="otp-code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            placeholder="123456"
-            value={token}
-            onChange={(event) => setToken(event.target.value.replace(/\D/g, "").slice(0, 6))}
-            className="text-center text-body-lg tracking-[0.3em]"
-          />
-        </Field>
+      <form className="mt-5" onSubmit={handleSubmit} noValidate>
+        <p id="otp-instructions" className="mb-3 text-center text-small text-ink-muted">
+          Enter the code below. It expires in about an hour.
+        </p>
+
+        <OtpInput
+          value={token}
+          onChange={setToken}
+          disabled={verifying}
+          invalid={Boolean(error)}
+          describedBy="otp-instructions"
+          autoFocus
+        />
 
         <Button
           type="submit"
           block
           size="lg"
-          className={authSubmitClass + " mt-2"}
+          className={authSubmitClass + " mt-5"}
           loading={verifying}
           loadingLabel="Verifying…"
-          disabled={!otpTokenSchema.safeParse(token).success}
+          disabled={!complete}
         >
-          {buttonLabel}
+          {submitLabel}
         </Button>
       </form>
 
-      <div className="mt-4 flex items-center justify-between gap-2 text-small">
+      <div className="mt-4 flex flex-col items-center gap-2 text-small">
+        <p className="text-ink-muted">
+          Didn&rsquo;t get it?{" "}
+          {cooldown > 0 ? (
+            <span className="text-ink-subtle">Resend in {cooldown}s</span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resending}
+              className="font-medium text-leaf-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-ink-subtle"
+            >
+              {resending ? "Sending…" : "Resend code"}
+            </button>
+          )}
+        </p>
         <button
           type="button"
-          onClick={onBack}
-          className="text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+          onClick={onChangeEmail}
+          disabled={verifying}
+          className="text-ink-muted underline-offset-2 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:text-ink-subtle"
         >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={onResend}
-          disabled={resending}
-          className="font-medium text-leaf-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-ink-subtle"
-        >
-          {resending ? "Sending…" : "Resend the code"}
+          Change email address
         </button>
       </div>
     </div>
@@ -473,6 +494,8 @@ export function SignUpForm({
     lastName: "",
     username: "",
   });
+  /** When the pending code was requested — used to spot an existing account. */
+  const [otpRequestedAt, setOtpRequestedAt] = React.useState<number | undefined>();
   const [otpError, setOtpError] = React.useState<string | null>(null);
   const [sendingOtp, setSendingOtp] = React.useState(false);
   const [verifyingOtp, setVerifyingOtp] = React.useState(false);
@@ -520,6 +543,7 @@ export function SignUpForm({
       lastName: values.lastName ?? "",
       username: values.username,
     });
+    setOtpRequestedAt(result.data.sentAt);
     setStep("otp");
   }
 
@@ -527,41 +551,64 @@ export function SignUpForm({
     setVerifyingOtp(true);
     setOtpError(null);
 
-    const result = await verifySignupOtp({ email: otpEmail, token });
+    const result = await verifySignupOtp({
+      email: otpEmail,
+      token,
+      requestedAt: otpRequestedAt,
+    });
     if (!result.ok) {
       setOtpError(result.error);
       setVerifyingOtp(false);
       return;
     }
 
-    // The OTP confirmed the account and created a session. Now set the password
-    // the new customer chose on the form.
+    // The address already had an account, so this code was a sign-in rather
+    // than a sign-up. The customer is authenticated now; writing the password
+    // from the signup form over it would silently change their credentials.
+    if (result.data.existingAccount) {
+      router.push(next);
+      router.refresh();
+      return;
+    }
+
+    // A brand-new account: apply the password chosen on the form so they can
+    // also sign in with email + password later.
     const pw = await updatePassword(otpPassword);
     if (!pw.ok) {
-      setOtpError(pw.error);
-      setVerifyingOtp(false);
-      return;
+      // They are authenticated either way. Trapping them on the code screen
+      // would be worse than landing them in the app, where the account page
+      // can set a password; recovery covers the gap if they never do.
+      console.error("[auth] could not set the signup password:", pw.error);
     }
 
     router.push(next);
     router.refresh();
   }
 
-  async function resendOtp() {
+  async function resendOtp(): Promise<boolean> {
     setResending(true);
     setOtpError(null);
-    const result = await sendSignupOtp({ email: otpEmail, ...otpMeta });
+    const result = await resendSignupOtp({ email: otpEmail, ...otpMeta });
     setResending(false);
-    if (!result.ok) setOtpError(result.error);
+    if (!result.ok) {
+      setOtpError(result.error);
+      return false;
+    }
+    setOtpRequestedAt(result.data.sentAt);
+    return true;
   }
 
   if (step === "otp") {
     return (
       <OtpStep
         email={otpEmail}
+        submitLabel="Verify & continue"
         onSubmit={confirmOtp}
         onResend={resendOtp}
-        onBack={() => setStep("form")}
+        onChangeEmail={() => {
+          setStep("form");
+          setOtpError(null);
+        }}
         error={otpError}
         verifying={verifyingOtp}
         resending={resending}
@@ -801,12 +848,16 @@ export function ForgotPasswordForm() {
     setStep("new-password");
   }
 
-  async function resend() {
+  async function resend(): Promise<boolean> {
     setResending(true);
     setOtpError(null);
     const result = await sendRecoveryOtp(email);
     setResending(false);
-    if (!result.ok) setOtpError(result.error);
+    if (!result.ok) {
+      setOtpError(result.error);
+      return false;
+    }
+    return true;
   }
 
   async function submitNewPassword(values: ResetPasswordInput) {
@@ -825,9 +876,10 @@ export function ForgotPasswordForm() {
     return (
       <OtpStep
         email={email}
+        submitLabel="Verify & continue"
         onSubmit={confirmOtp}
         onResend={resend}
-        onBack={() => setStep("form")}
+        onChangeEmail={() => setStep("form")}
         error={otpError}
         verifying={busy}
         resending={resending}

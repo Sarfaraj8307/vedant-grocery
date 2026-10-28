@@ -4,7 +4,8 @@
 
 | | |
 |---|---|
-| **Production URL** | https://vedant-grocery.vercel.app |
+| **Production URL** | https://vedantfreshmart.in (canonical, apex; `www` 308-redirects to it) |
+| **Also live at** | https://vedant-grocery.vercel.app — a secondary alias, never the auth domain |
 | **Vercel project** | `khansarfarajkhan-8498/vedant-grocery` |
 | **Region** | Vercel default (functions run closest to the visitor) |
 | **Supabase project** | `hyibaljxicojfoxbihdn`, region `ap-south-1` (Mumbai) |
@@ -19,7 +20,7 @@ does not gate the production alias — only preview deployments.
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://hyibaljxicojfoxbihdn.supabase.co` | No — ships in the browser bundle |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable__…` | No — same reason |
-| `NEXT_PUBLIC_SITE_URL` | `https://vedant-grocery.vercel.app` | No |
+| `NEXT_PUBLIC_SITE_URL` | `https://vedantfreshmart.in` | No |
 
 `NEXT_PUBLIC_SITE_URL` is **not optional**. Without it, canonical links, OpenGraph URLs and the
 `GroceryStore` JSON-LD all point at `http://localhost:3000` — which shipped in the first deploy
@@ -94,8 +95,8 @@ earlier commit — the app is stateless apart from Supabase.
 
 ## Known deployment limitations
 
-- No custom domain. `vedant-grocery.vercel.app` is the production URL. Adding a domain is a
-  dashboard step plus a `NEXT_PUBLIC_SITE_URL` change.
+- The canonical domain is `https://vedantfreshmart.in` (apex). `www` redirects to it, so the
+  apex is the only host that needs to appear in Supabase's redirect allowlist.
 - No CI gate on deploy. `.github/workflows/ci.yml` exists but there is no remote, so it has never
   run. Deploys are manual and currently unverified by CI.
 - Preview deployments require Vercel authentication.

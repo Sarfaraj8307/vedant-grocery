@@ -90,13 +90,9 @@ export const forgotPasswordSchema = z.object({
 
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
-/** 6-digit email OTP code. */
-export const otpTokenSchema = z
-  .string()
-  .trim()
-  .regex(/^\d{6}$/, "Enter the 6-digit code from your email");
-
-export type OtpTokenInput = z.infer<typeof otpTokenSchema>;
+// The 6-digit code is validated by `isCompleteOtp` in `lib/otp`, which the OTP
+// boxes already use to decide when the submit button is enabled. A second
+// schema here would be a second definition of "complete" to keep in step.
 
 export const resetPasswordSchema = z
   .object({
