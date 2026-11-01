@@ -73,7 +73,7 @@ an email.
 
 ## Supabase configuration — current state
 
-Applied via the Management API on 2026-10-28 and read back to confirm.
+Applied via the Management API and read back to confirm each value.
 
 | Setting | Before | Now |
 |---|---|---|
@@ -81,38 +81,42 @@ Applied via the Management API on 2026-10-28 and read back to confirm.
 | **Redirect URLs** | only `*.vercel.app` + localhost | `https://vedantfreshmart.in/**`, `https://vedantfreshmart.in`, `http://localhost:3000/**` |
 | **OTP length** | `8` | `6` (matches the six boxes) |
 | **Verify rate limit** | `30`/hour | `10`/hour |
+| **SMTP** | none (built-in mailer) | Brevo relay, `smtp-relay.brevo.com:587` |
+| **Sender** | — | `Vedant Fresh Mart` |
+| **Emails per hour** | `2` | `30` |
+| **Templates** | link only | `{{ .Token }}` + link fallback |
 
 The Site URL was the "Vercel redirect" bug: every `emailRedirectTo` was silently
 rewritten to the old Vercel host because the apex domain was not in the allowlist.
 The OTP length was the other half — Supabase was minting **8-digit** codes for a UI
 that accepts six.
 
-### Still blocked by the plan
+Adding the Brevo mailer unlocked the template editor, which the free tier blocks
+while the built-in mailer is in use.
 
-Two settings cannot be changed on this project as it stands. Both were attempted
-and rejected by the API:
+**Verified end to end on 2026-11-01**: a real `signInWithOtp` request produced
+Brevo events `requests → delivered → opened` for the subject
+`Your Vedant Fresh Mart verification code`.
 
-| Setting | Error | Unblocks with |
-|---|---|---|
-| **Email templates** (add `{{ .Token }}`) | *"Email template modification is not available for free tier projects using the default email provider."* | A custom SMTP provider, or a Pro plan |
-| **Time-box user sessions** (the one-month cap) | *"User sessions can only be configured on Pro Plans and up."* | Pro plan |
+### One setting still needs a Pro plan
 
-**Until custom SMTP is configured, the emailed code does not exist** — the
-default template renders only `{{ .ConfirmationURL }}`. The signup screen
-therefore tells the customer they can either type the code or open the link, and
-the link path (via `/auth/callback`) signs them in. A customer who arrives that
-way has no password set, because the password is applied only after a code is
-verified; they can set one through "Forgot password".
+| Setting | Error |
+|---|---|
+| **Time-box user sessions** (the one-month cap) | *"User sessions can only be configured on Pro Plans and up."* |
 
-The moment SMTP is configured, put this in the three templates (Confirm signup,
-Magic Link, Reset Password) and the code path takes over with no code change:
+Everything else in this document is live.
 
-```html
-<h2>Vedant Fresh Mart</h2>
-<p>Your verification code is:</p>
-<p style="font-size:30px;font-weight:700;letter-spacing:8px;margin:18px 0">{{ .Token }}</p>
-<p>Enter this code on vedantfreshmart.in to continue.</p>
-```
+### Sender address — worth fixing
+
+No domain is authenticated in Brevo, so the only verified sender is a personal
+Gmail address and Brevo rewrites the envelope to
+`…@<account>.brevosend.com`. Customers see the display name **Vedant Fresh Mart**,
+which is what matters most, but the underlying address is not the store's.
+
+To send as `orders@vedantfreshmart.in`: add the domain in Brevo → Senders,
+Domains & IPs → Domains, publish the DKIM/SPF records it generates at the DNS
+provider, then change `smtp_admin_email` to the new address. Until then, expect
+some spam-folder placement — an unauthenticated domain is a spam signal.
 
 ### Providers → Email
 
@@ -120,33 +124,22 @@ Email is enabled and **"Confirm email" is on** (`mailer_autoconfirm = false`,
 confirmed via `/auth/v1/settings`). Turning it off would make `signInWithOtp`
 skip verification entirely.
 
-### Custom SMTP is the real unblock
-
-Everything still missing traces to one thing: the project uses Supabase's built-in
-mailer, which is capped at **2 emails per hour** and, on the free tier, locks the
-template editor. Configuring Authentication → Emails → SMTP Settings with any
-transactional provider (Resend, Brevo, Zoho, a Workspace mailbox) fixes all of it
-at once:
-
-- the template editor unlocks, so `{{ .Token }}` can be added;
-- the 2/hour cap goes away, so "Send a new code" actually works more than once;
-- delivery stops being best-effort.
-
 ## How to verify the flow end to end
 
 You need an inbox you can read.
 
 1. Sign up at `https://vedantfreshmart.in/signup` with that address.
-2. Today the email shows a **link**, because the template editor is locked until
-   custom SMTP exists. Opening it must land on `vedantfreshmart.in` — not
-   `*.vercel.app` — and sign the customer in.
-3. Once SMTP is configured the email must show **six digits**; then enter them,
-   and a wrong code shows "That code is invalid or has expired".
+2. The email must show **six digits** under "Your verification code is:". If it
+   shows only a link, the template did not take — check
+   `mailer_templates_confirmation_content`.
+3. Enter the digits. A wrong code shows "That code is invalid or has expired";
+   five wrong codes burn the code and ask for a new one.
 4. After verifying, the browser lands on `/` signed in; reload and the session
    survives.
 5. Sign out, then sign in with the same email and password.
 6. Repeat with the *same* email from `/signup`: it must sign the customer in and
    must **not** change their password.
+7. Any link in the email must land on `vedantfreshmart.in` — never `*.vercel.app`.
 
 ## Attempt limiting — what it does and does not protect
 
@@ -199,15 +192,15 @@ so nothing here can enforce it today.
 
 ## Known limitations
 
-- **The emailed code does not exist yet.** The template editor is locked on the
-  free tier without custom SMTP, so the default template still renders only a
-  link. The OTP screen says so and offers the link as the fallback.
-- **A link-verified customer has no password**, because the password is applied
-  only after a code is verified. They set one via "Forgot password".
-- **Email delivery is capped at 2 per hour** by the built-in mailer, so "Send a
-  new code" can fail with `email rate limit exceeded` until SMTP is configured.
+- **The sender is not the store's domain yet.** No domain is authenticated in
+  Brevo, so mail leaves from a personal Gmail address via `*.brevosend.com` (the
+  display name is still "Vedant Fresh Mart"). Authenticate `vedantfreshmart.in`
+  to fix delivery rates as well as appearances.
 - **Sessions cannot be time-boxed on the free tier**, so the one-month cap is not
   active. Sessions otherwise persist and refresh correctly.
+- **The OTP screen still offers the email link** as a fallback. That is now a
+  convenience rather than a necessity — the code works — but the copy stays until
+  someone confirms the code path on a real device.
 - **Recovery codes reuse the OTP screen** but not the signup guard: a recovery
   code always resolves to an existing account, which is the point.
 - If `updateUser({ password })` fails after a successful verification the
