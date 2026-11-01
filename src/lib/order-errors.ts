@@ -79,6 +79,59 @@ export function describePlaceOrderError(error: {
     };
   }
 
+  // --- Guards `place_order_app` raises that were previously unmapped ---------
+  //
+  // These fell through to the generic sentence. That is how a total checkout
+  // outage once presented itself as "please try again in a moment": the real
+  // fault was a broken trigger raising 42703, which is not customer copy but
+  // also not this sentence's job to hide. Each branch below exists because the
+  // database can genuinely say it.
+  if (
+    message.includes("blocked from ordering") ||
+    message.includes("not permitted to place orders")
+  ) {
+    return {
+      message:
+        "Your account can't place orders at the moment. Please contact us and we'll sort it out.",
+      sqlState,
+    };
+  }
+  if (message.includes("delivery area not served")) {
+    return {
+      message:
+        "We don't deliver to that address yet. Please choose a different delivery address.",
+      sqlState,
+    };
+  }
+  if (message.includes("store closed")) {
+    return {
+      message: "We're not taking orders right now. Please try again later today.",
+      sqlState,
+    };
+  }
+  if (message.includes("order failed")) {
+    return {
+      message:
+        "We couldn't complete that order. Your basket is unchanged — please review it and try again.",
+      sqlState,
+    };
+  }
+  // The wrapper forwards these inner codes verbatim when it has no mapping.
+  if (message.includes("DUPLICATE_OR_RETRY")) {
+    return {
+      message:
+        "That order was already submitted. Check your order history before trying again.",
+      sqlState,
+    };
+  }
+  if (message.includes("VALIDATION")) {
+    return {
+      message:
+        "Something in your basket changed while you were checking out. Please review it and try again.",
+      sqlState,
+    };
+  }
+
   // Never surface raw database text to a customer.
   return {
     message:
