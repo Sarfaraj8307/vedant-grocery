@@ -35,8 +35,6 @@ export type ComplaintStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 
 export type ComplaintAuthorRole = "CUSTOMER" | "ADMIN";
 
-export type MediaType = "image/jpeg" | "image/png" | "image/webp";
-
 export type ProfileRow = {
   id: string;
   username: string;
@@ -235,8 +233,8 @@ export type ComplaintAttachmentRow = {
   id: string;
   complaint_id: string;
   storage_path: string;
-  media_type: MediaType;
-  created_at: string;
+  content_type: string;
+  size: number;
 };
 
 export type NotificationRow = {

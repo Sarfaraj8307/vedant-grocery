@@ -7,6 +7,7 @@ import {
   toCatalogueProduct,
   type ProductNestedRow,
 } from "@/lib/catalogue-shared";
+import { istDayKey, istMidnight, shiftDayKey } from "@/lib/format";
 import type {
   CatalogueProduct,
   CategoryRow,
@@ -203,15 +204,17 @@ export async function getLiveOffers(): Promise<
  * pick a slot the server would reject.
  *
  * **Slots roll forward by themselves.** Before reading, this calls
- * `auto_ensure_delivery_slots()`, which idempotently materialises today … today+6
- * in IST. That is what keeps tomorrow's windows appearing every day without
- * anyone pressing a button. The call is best-effort: it needs an authenticated
- * session (staff), so a signed-out shopper simply reads whatever already exists
- * rather than failing the page. `admin` screens and the admin app also trigger
- * the same function, so the window is topped up from either surface.
+ * `auto_ensure_delivery_slots()`, which idempotently materialises the coming
+ * days in IST. The window returned here is bounded to a rolling 3-day IST
+ * horizon (today, tomorrow, day-after). That is what keeps tomorrow's windows
+ * appearing every day without anyone pressing a button. The call is
+ * best-effort: it needs an authenticated session (staff), so a signed-out
+ * shopper simply reads whatever already exists rather than failing the page.
+ * `admin` screens and the admin app also trigger the same function, so the
+ * window is topped up from either surface.
  */
 export async function getDeliverySlots(
-  horizonDays = 7,
+  horizonDays = 3,
 ): Promise<DeliverySlotRow[]> {
   const supabase = await getSupabaseServerClient();
 
@@ -223,15 +226,23 @@ export async function getDeliverySlots(
     // No session / not staff / transient failure — read what is there.
   }
 
+  // Rolling 3-day IST window: today 00:00 IST … today+horizonDays 00:00 IST
+  // (exclusive). Slots are generated in IST, so the window must be anchored to
+  // IST too, not the server's UTC clock — otherwise the day-after would be
+  // cut off or yesterday's slots would leak in around the midnight boundary.
   const now = new Date();
-  const horizon = new Date(now.getTime() + horizonDays * 86_400_000);
+  const todayKey = istDayKey(now);
+  const horizonStart = istMidnight(todayKey);
+  const horizonEnd = istMidnight(shiftDayKey(todayKey, horizonDays));
 
   const { data, error } = await supabase
     .from("delivery_slots")
     .select("*")
     .eq("is_active", true)
+    // Never render a slot that has already started.
     .gt("starts_at", now.toISOString())
-    .lt("starts_at", horizon.toISOString())
+    .gte("starts_at", horizonStart.toISOString())
+    .lt("starts_at", horizonEnd.toISOString())
     .order("starts_at", { ascending: true });
 
   if (error) throw new CatalogueError("Could not load delivery slots.", error);

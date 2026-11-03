@@ -48,6 +48,7 @@ export default async function CheckoutPage() {
         slotLoad={slotLoad}
         acceptingOrders={store.acceptingOrders}
         closedReason={store.closedReason}
+        instantEnabled={store.instantDeliveryEnabled}
       />
     </div>
   );

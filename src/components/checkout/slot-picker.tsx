@@ -1,31 +1,39 @@
 "use client";
 
 import * as React from "react";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Zap } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/menu";
 import { Badge } from "@/components/ui/badge";
-import { formatSlotRange, relativeDay } from "@/lib/format";
+import { formatSlotRange } from "@/lib/format";
+import { buildThreeDaySlots } from "@/lib/ist-slots";
 import { cn } from "@/lib/utils";
 import type { DeliverySlotRow } from "@/types/database";
+
+/** Stable "value" for the Instant Delivery radio inside the shared group. */
+const INSTANT_DELIVERY_VALUE = "__instant__";
 
 /**
  * Delivery slot picker.
  *
- * Slots are grouped by day and rendered as radio options, which gives keyboard
- * arrow navigation and `aria-checked` for free.
+ * Slots are grouped by their IST calendar day (today / tomorrow / day-after)
+ * and rendered as radio options. The three days are always shown, so a day
+ * with no slots reads "no slots yet" instead of disappearing. When the store
+ * offers instant delivery, a leading "Instant Delivery" option appears above
+ * the scheduled slots.
  *
- * The component only ever receives slots that already satisfy the server's
- * predicate (`is_active` AND `starts_at > now()`), because `getDeliverySlots`
- * applies exactly the same filter `place_order` applies. Capacity is shown but
- * treated as a hint: the authoritative capacity check happens inside the
- * transaction, and a full slot surfaces as a `delivery slot full` error which
- * the checkout maps to "that slot just filled up — pick another".
+ * Capacity is shown but treated as a hint: the authoritative capacity check
+ * happens inside the transaction, and a full slot surfaces as a "delivery slot
+ * full" error which the checkout maps to "that slot just filled up — pick
+ * another".
  */
 export function SlotPicker({
   slots,
   load,
   selectedId,
   onSelect,
+  instantEnabled = false,
+  instantSelected = false,
+  onSelectInstant,
   className,
 }: {
   slots: DeliverySlotRow[];
@@ -33,103 +41,119 @@ export function SlotPicker({
   load: Record<string, number>;
   selectedId: string | null;
   onSelect: (slot: DeliverySlotRow) => void;
+  /** Show the Instant Delivery option. */
+  instantEnabled?: boolean;
+  /** Whether Instant Delivery is currently selected. */
+  instantSelected?: boolean;
+  onSelectInstant?: () => void;
   className?: string;
 }) {
-  const grouped = React.useMemo(() => {
-    const map = new Map<string, DeliverySlotRow[]>();
-    for (const slot of slots) {
-      const key = new Date(slot.starts_at).toDateString();
-      const list = map.get(key);
-      if (list) list.push(slot);
-      else map.set(key, [slot]);
-    }
-    return [...map.entries()];
-  }, [slots]);
+  const days = React.useMemo(() => buildThreeDaySlots(slots), [slots]);
 
-  if (slots.length === 0) {
-    return (
-      <div className={cn("rounded-md border border-warning-bg bg-warning-bg p-4", className)}>
-        <p className="flex items-start gap-2 text-small text-warning">
-          <CalendarClock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>
-            <strong className="font-semibold">
-              No delivery slots are open right now.
-            </strong>{" "}
-            We publish slots a few days ahead. Please{" "}
-            <a href="/contact" className="underline underline-offset-2">
-              message the shop
-            </a>{" "}
-            and we will arrange a time with you directly.
-          </span>
-        </p>
-      </div>
-    );
-  }
+  const radioValue = instantSelected
+    ? INSTANT_DELIVERY_VALUE
+    : (selectedId ?? undefined);
 
   return (
     <RadioGroup
-      value={selectedId ?? undefined}
+      value={radioValue}
       onValueChange={(value) => {
+        if (value === INSTANT_DELIVERY_VALUE) {
+          onSelectInstant?.();
+          return;
+        }
         const found = slots.find((s) => s.id === value);
         if (found) onSelect(found);
       }}
       className={cn("flex flex-col gap-4", className)}
-      aria-label="Delivery slot"
+      aria-label="Delivery option"
     >
-      {grouped.map(([dayKey, daySlots]) => (
-        <div key={dayKey} className="flex flex-col gap-2">
-          <p className="text-caption text-ink-subtle">
-            {relativeDay(daySlots[0]!.starts_at)}
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {daySlots.map((slot) => {
-              const booked = load[slot.id] ?? 0;
-              const remaining = Math.max(0, slot.capacity - booked);
-              const full = remaining === 0;
-              const selected = slot.id === selectedId;
+      {instantEnabled ? (
+        <label
+          htmlFor="slot-instant"
+          className={cn(
+            "flex cursor-pointer items-center gap-3 rounded-md border-[1.5px] px-3 py-2.5 transition-colors",
+            instantSelected
+              ? "border-leaf-600 bg-leaf-50"
+              : "border-line bg-surface hover:border-line-strong",
+          )}
+        >
+          <RadioGroupItem value={INSTANT_DELIVERY_VALUE} id="slot-instant" />
+          <Zap className="size-4 shrink-0 text-leaf-600" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-body font-medium text-ink">
+              Instant Delivery
+            </span>
+            <span className="mt-0.5 block text-small text-ink-subtle">
+              Delivered as soon as possible
+            </span>
+          </span>
+        </label>
+      ) : null}
 
-              return (
-                <label
-                  key={slot.id}
-                  htmlFor={`slot-${slot.id}`}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-3 rounded-md border-[1.5px] px-3 py-2.5 transition-colors",
-                    selected
-                      ? "border-leaf-600 bg-leaf-50"
-                      : "border-line bg-surface hover:border-line-strong",
-                    full && "cursor-not-allowed opacity-50 hover:border-line",
-                  )}
-                >
-                  <RadioGroupItem
-                    value={slot.id}
-                    id={`slot-${slot.id}`}
-                    disabled={full}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-body font-medium text-ink">
-                      {formatSlotRange(slot.starts_at, slot.ends_at)}
+      {days.map((day) => (
+        <div key={day.dayKey} className="flex flex-col gap-2">
+          <p className="text-caption text-ink-subtle">{day.label}</p>
+
+          {day.slots.length === 0 ? (
+            <div className="flex items-start gap-2 rounded-md border border-line bg-surface-muted px-3 py-2.5 text-small text-ink-muted">
+              <CalendarClock
+                className="mt-0.5 size-4 shrink-0"
+                aria-hidden="true"
+              />
+              <span>No slots yet for this day.</span>
+            </div>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {day.slots.map((slot) => {
+                const booked = load[slot.id] ?? 0;
+                const remaining = Math.max(0, slot.capacity - booked);
+                const full = remaining === 0;
+                const selected = slot.id === selectedId;
+
+                return (
+                  <label
+                    key={slot.id}
+                    htmlFor={`slot-${slot.id}`}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-md border-[1.5px] px-3 py-2.5 transition-colors",
+                      selected
+                        ? "border-leaf-600 bg-leaf-50"
+                        : "border-line bg-surface hover:border-line-strong",
+                      full && "cursor-not-allowed opacity-50 hover:border-line",
+                    )}
+                  >
+                    <RadioGroupItem
+                      value={slot.id}
+                      id={`slot-${slot.id}`}
+                      disabled={full}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-body font-medium text-ink">
+                        {formatSlotRange(slot.starts_at, slot.ends_at)}
+                      </span>
+                      <span className="mt-0.5 block text-small text-ink-subtle">
+                        {full
+                          ? "Fully booked"
+                          : remaining <= 3
+                            ? `Only ${remaining} left`
+                            : "Available"}
+                      </span>
                     </span>
-                    <span className="mt-0.5 block text-small text-ink-subtle">
-                      {full
-                        ? "Fully booked"
-                        : remaining <= 3
-                          ? `Only ${remaining} left`
-                          : "Available"}
-                    </span>
-                  </span>
-                  {full ? (
-                    <Badge variant="neutral" size="sm">
-                      Full
-                    </Badge>
-                  ) : remaining <= 3 ? (
-                    <Badge variant="warning" size="sm">
-                      Almost full
-                    </Badge>
-                  ) : null}
-                </label>
-              );
-            })}
-          </div>
+                    {full ? (
+                      <Badge variant="neutral" size="sm">
+                        Full
+                      </Badge>
+                    ) : remaining <= 3 ? (
+                      <Badge variant="warning" size="sm">
+                        Almost full
+                      </Badge>
+                    ) : null}
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
       ))}
     </RadioGroup>

@@ -84,7 +84,12 @@ export type SubmitOrderResult =
 export async function submitOrder(input: {
   requestId: string;
   addressId: string;
-  deliverySlotId: string;
+  /**
+   * The chosen scheduled slot id, or `null` for Instant Delivery (an order
+   * placed without a delivery slot). Passed straight through to `place_order`,
+   * which applies the server-side gate for instant orders.
+   */
+  deliverySlotId: string | null;
 }): Promise<SubmitOrderResult> {
   // Order acceptance (§9/§36). `place_order` enforces this itself with
   // STORE_CLOSED; checking here first only exists so the customer gets the

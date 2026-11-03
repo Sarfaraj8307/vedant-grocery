@@ -27,6 +27,13 @@ export type StoreStatus = {
   readonly deliveryFee: number | null;
   readonly freeDeliveryThreshold: number | null;
   readonly minOrderAmount: number | null;
+  /**
+   * Whether instant delivery is offered (operator toggle). IMPORTANT: unlike
+   * the rest of the store status this fails *closed* (false) — a transient read
+   * error must never wrongly offer instant delivery, because an order placed
+   * without a slot has no scheduled slot to fall back on.
+   */
+  readonly instantDeliveryEnabled: boolean;
 };
 
 const UNKNOWN: StoreStatus = {
@@ -36,6 +43,7 @@ const UNKNOWN: StoreStatus = {
   deliveryFee: null,
   freeDeliveryThreshold: null,
   minOrderAmount: null,
+  instantDeliveryEnabled: false,
 };
 
 type StoreSettingsRow = {
@@ -45,6 +53,7 @@ type StoreSettingsRow = {
   delivery_fee: number | null;
   free_delivery_threshold: number | null;
   min_order_amount: number | null;
+  instant_delivery_enabled: boolean | null;
 };
 
 /**
@@ -57,7 +66,7 @@ export const getStoreStatus = cache(async (): Promise<StoreStatus> => {
     const { data, error } = await supabase
       .from("store_settings")
       .select(
-        "is_open, acceptance_reason, store_name, delivery_fee, free_delivery_threshold, min_order_amount",
+        "is_open, acceptance_reason, store_name, delivery_fee, free_delivery_threshold, min_order_amount, instant_delivery_enabled",
       )
       .eq("id", 1)
       .maybeSingle();
@@ -74,6 +83,7 @@ export const getStoreStatus = cache(async (): Promise<StoreStatus> => {
       deliveryFee: row.delivery_fee,
       freeDeliveryThreshold: row.free_delivery_threshold,
       minOrderAmount: row.min_order_amount,
+      instantDeliveryEnabled: row.instant_delivery_enabled === true,
     };
   } catch {
     return UNKNOWN;

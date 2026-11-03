@@ -75,6 +75,67 @@ export function relativeDay(input: string | Date): string {
   return dayFormatter.format(date);
 }
 
+/* -------------------------------------------------------------------------- */
+/* IST (Asia/Kolkata) calendar helpers — used by delivery slots               */
+/* -------------------------------------------------------------------------- */
+
+/** The timezone the store operates in (delivery slots are IST-anchored). */
+export const IST_TIME_ZONE = "Asia/Kolkata";
+
+/** Wall-clock calendar parts ({y,m,d}) of an instant in IST. */
+function istDateParts(input: string | Date): { y: string; m: string; d: string } {
+  const date = typeof input === "string" ? new Date(input) : input;
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: IST_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  // en-CA renders as YYYY-MM-DD.
+  const [y, m, d] = fmt.format(date).split("-");
+  return { y, m, d };
+}
+
+/**
+ * The IST calendar-date key for an instant, e.g. "2026-11-04".
+ * This is the correct grouping key for delivery slots: `starts_at`/`ends_at`
+ * are timestamptz and each slot belongs to exactly one IST day.
+ */
+export function istDayKey(input: string | Date): string {
+  const p = istDateParts(input);
+  return `${p.y}-${p.m}-${p.d}`;
+}
+
+/** Shift a YYYY-MM-DD key by a whole number of days. */
+export function shiftDayKey(dayKey: string, days: number): string {
+  const d = new Date(`${dayKey}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The absolute instant at 00:00 IST on a given YYYY-MM-DD key. */
+export function istMidnight(dayKey: string): Date {
+  return new Date(`${dayKey}T00:00:00+05:30`);
+}
+
+/** Whole days between an instant's IST date and IST today (negative = past). */
+export function istDayOffset(input: string | Date, now: Date = new Date()): number {
+  return Math.round(
+    (Date.parse(istDayKey(input)) - Date.parse(istDayKey(now))) / 86_400_000,
+  );
+}
+
+/** IST-aware "Today" / "Tomorrow" / weekday label for a delivery slot. */
+export function relativeDayIST(
+  input: string | Date,
+  now: Date = new Date(),
+): string {
+  const offset = istDayOffset(input, now);
+  if (offset === 0) return "Today";
+  if (offset === 1) return "Tomorrow";
+  return dayFormatter.format(typeof input === "string" ? new Date(input) : input);
+}
+
 export function formatDate(input: string | Date): string {
   const date = typeof input === "string" ? new Date(input) : input;
   return dateFormatter.format(date);

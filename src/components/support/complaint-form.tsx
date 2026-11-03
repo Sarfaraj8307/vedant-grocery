@@ -4,16 +4,21 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Send } from "lucide-react";
+import { Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/menu";
 import { complaintSchema, type ComplaintInput } from "@/lib/validation";
-import { createComplaint, replyToComplaint } from "@/services/support-service";
+import { createComplaint, replyToComplaint, uploadComplaintAttachment, validateComplaintAttachment } from "@/services/support-service";
 import { formatDateTime } from "@/lib/format";
 import type { ComplaintMessageRow, OrderRow } from "@/types/database";
+
+/** Max images a customer can attach to one report. */
+const MAX_ATTACHMENTS = 5;
+
+type PendingAttachment = { file: File; url: string };
 
 /** New support thread. */
 export function ComplaintForm({
@@ -45,6 +50,59 @@ export function ComplaintForm({
   // would make the React Compiler skip memoising this whole component.
   const [orderId, setOrderId] = React.useState(defaultOrderId ?? "");
 
+  const [attachments, setAttachments] = React.useState<PendingAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = React.useState<string | null>(null);
+
+  // Always-current mirror of `attachments` so the unmount cleanup can revoke
+  // the latest object URLs without depending on a stale render closure.
+  const attachmentsRef = React.useRef<PendingAttachment[]>([]);
+  React.useEffect(() => {
+    attachmentsRef.current = attachments;
+  });
+  React.useEffect(() => {
+    return () => {
+      for (const attachment of attachmentsRef.current) {
+        URL.revokeObjectURL(attachment.url);
+      }
+    };
+  }, []);
+
+  function handleFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(event.target.files ?? []);
+    // Reset the input so re-selecting the same file still fires `change`.
+    event.target.value = "";
+
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      setAttachmentError(`You can attach up to ${MAX_ATTACHMENTS} photos.`);
+      return;
+    }
+
+    const next = [...attachments];
+    let error: string | null = null;
+    for (const file of selected) {
+      if (next.length >= MAX_ATTACHMENTS) {
+        error = `You can attach up to ${MAX_ATTACHMENTS} photos.`;
+        break;
+      }
+      const invalid = validateComplaintAttachment(file);
+      if (invalid) {
+        error = invalid;
+        continue;
+      }
+      next.push({ file, url: URL.createObjectURL(file) });
+    }
+    setAttachments(next);
+    setAttachmentError(error);
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => {
+      const removed = prev[index];
+      if (removed) URL.revokeObjectURL(removed.url);
+      return prev.filter((_, i) => i !== index);
+    });
+  }
+
   async function onSubmit(values: ComplaintInput) {
     const result = await createComplaint({
       subject: values.subject,
@@ -56,8 +114,29 @@ export function ComplaintForm({
       setError("root", { message: result.error });
       return;
     }
+
+    // The complaint is sent; now try to upload each attached photo (if any).
+    // A failed upload never fails the whole submission — the message is already
+    // recorded, so we only surface a calm note that some photos did not make it.
+    const complaintId = result.data;
+    let failedPhotos = 0;
+    for (const attachment of attachments) {
+      const uploadResult = await uploadComplaintAttachment(complaintId, attachment.file);
+      if (!uploadResult.ok) failedPhotos += 1;
+    }
+
+    // Release the object URLs now that the previews are no longer needed.
+    for (const attachment of attachments) {
+      URL.revokeObjectURL(attachment.url);
+    }
+    setAttachments([]);
+    setAttachmentError(null);
+
     setSent(true);
     toast.success("Message sent — we will reply here");
+    if (failedPhotos > 0) {
+      toast.info("Message sent — some photos could not be uploaded");
+    }
     router.refresh();
   }
 
@@ -147,6 +226,64 @@ export function ComplaintForm({
           </Select>
         </Field>
       ) : null}
+
+      <div className="mt-4">
+        <span id="attachment-label" className="text-small font-medium text-ink">
+          Photos (optional)
+        </span>
+        <label
+          htmlFor="attachment-input"
+          className="mt-1.5 inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-surface-muted px-3 py-2 text-small font-medium text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
+        >
+          <Paperclip className="size-4" aria-hidden="true" />
+          Attach photos
+          <input
+            id="attachment-input"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="sr-only"
+            onChange={handleFilesSelected}
+            disabled={isSubmitting}
+          />
+        </label>
+        <p className="mt-1 text-caption text-ink-subtle">
+          Up to {MAX_ATTACHMENTS} images — JPG, PNG or WebP, 5 MB each.
+        </p>
+        {attachmentError ? (
+          <p role="alert" className="mt-1.5 text-small text-danger">
+            {attachmentError}
+          </p>
+        ) : null}
+        {attachments.length > 0 ? (
+          <ul
+            aria-label="Selected photos"
+            className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4"
+          >
+            {attachments.map((attachment, index) => (
+              <li
+                key={attachment.url}
+                className="group relative aspect-square overflow-hidden rounded-md border border-line"
+              >
+                <img
+                  src={attachment.url}
+                  alt={`Selected photo ${index + 1}`}
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(index)}
+                  disabled={isSubmitting}
+                  aria-label={`Remove photo ${index + 1}`}
+                  className="absolute right-1 top-1 rounded-full bg-ink/70 p-1 text-white transition-colors hover:bg-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
+                >
+                  <X className="size-3.5" aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
 
       <Button type="submit" loading={isSubmitting} loadingLabel="Sending…">
         <Send className="size-4" aria-hidden="true" />

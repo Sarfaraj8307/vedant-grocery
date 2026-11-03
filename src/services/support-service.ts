@@ -90,6 +90,104 @@ export async function getComplaint(
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/* Complaint attachment uploads                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Allowed image MIME types, matching the `complaint-images` bucket's
+ * `allowed_mime_types`.
+ */
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+/** Matches the `complaint-images` bucket's `file_size_limit` (5 MB). */
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Client-side check mirroring the `complaint-images` bucket limits. Returns a
+ * human-readable error string when the file is not acceptable, or `null` when
+ * it is. This is a UX affordance — the storage policy remains authoritative.
+ */
+export function validateComplaintAttachment(file: File): string | null {
+  if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+    return "Please attach a JPG, PNG or WebP image.";
+  }
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    return "Photos must be 5 MB or smaller.";
+  }
+  return null;
+}
+
+/**
+ * Build the storage path for a complaint attachment.
+ *
+ * The bucket's `complaint_images_owner_insert` policy requires the first path
+ * segment to be the uploader's uid, so the shape is always
+ * `{uid}/{complaintId}/{uuid}-{sanitized name}`. The base name is sanitized to
+ * safe URL characters and truncated, falling back to "image" when empty.
+ */
+export function buildComplaintAttachmentPath(
+  userId: string,
+  complaintId: string,
+  fileName: string,
+): string {
+  const sanitized = fileName
+    .replace(/[^A-Za-z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  const base = sanitized || "image";
+  return `${userId}/${complaintId}/${globalThis.crypto.randomUUID()}-${base}`;
+}
+
+/**
+ * Upload one validated image to the `complaint-images` bucket and record it
+ * against the complaint. Any failure (validation, auth, storage, or the insert)
+ * returns a friendly, generic message — never raw provider codes or SQLSTATE.
+ */
+export async function uploadComplaintAttachment(
+  complaintId: string,
+  file: File,
+): Promise<SupportResult<null>> {
+  const validationError = validateComplaintAttachment(file);
+  if (validationError) return { ok: false, error: validationError };
+
+  const supabase = getSupabaseBrowserClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Please sign in to attach photos." };
+  }
+
+  const path = buildComplaintAttachmentPath(user.id, complaintId, file.name);
+
+  const { error: uploadError } = await supabase.storage
+    .from("complaint-images")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) {
+    return { ok: false, error: "We could not upload that photo. Please try again." };
+  }
+
+  const { error: insertError } = await supabase
+    .from("complaint_attachments")
+    .insert({
+      complaint_id: complaintId,
+      storage_path: path,
+      content_type: file.type,
+      size: file.size,
+    });
+  if (insertError) {
+    return { ok: false, error: "We could not save that photo. Please try again." };
+  }
+
+  return { ok: true, data: null };
+}
+
 /** Follow-up message on an existing thread. */
 export async function replyToComplaint(
   complaintId: string,

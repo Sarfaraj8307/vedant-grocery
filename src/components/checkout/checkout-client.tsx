@@ -19,6 +19,7 @@ import {
 } from "@/app/checkout/actions";
 import type { ServiceabilityVerdict } from "@/lib/serviceability";
 import { formatSlotWindow } from "@/lib/format";
+import { shouldOfferInstantDelivery } from "@/lib/instant-delivery";
 import { cn } from "@/lib/utils";
 import type { AddressRow, DeliverySlotRow } from "@/types/database";
 
@@ -48,6 +49,7 @@ export function CheckoutClient({
   slotLoad,
   acceptingOrders = true,
   closedReason = null,
+  instantEnabled = false,
 }: {
   initialAddresses: AddressRow[];
   slots: DeliverySlotRow[];
@@ -60,6 +62,14 @@ export function CheckoutClient({
    */
   acceptingOrders?: boolean;
   closedReason?: string | null;
+  /**
+   * Whether the store has instant delivery enabled
+   * (`store_settings.instant_delivery_enabled`). Read on the server and passed
+   * down; the Instant Delivery option is shown only when this is true AND the
+   * store is accepting orders. Fail-open semantics on the flag mean a transient
+   * read error hides the option rather than wrongly offering it.
+   */
+  instantEnabled?: boolean;
 }) {
   const router = useRouter();
   const { count, isEmpty, hydrating, totals } = useCart();
@@ -70,6 +80,7 @@ export function CheckoutClient({
     initialAddresses.find((a) => a.is_default)?.id ?? initialAddresses[0]?.id ?? null,
   );
   const [selectedSlotId, setSelectedSlotId] = React.useState<string | null>(null);
+  const [instantSelected, setInstantSelected] = React.useState(false);
   const [placing, setPlacing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -123,7 +134,7 @@ export function CheckoutClient({
   const readyToPlace =
     acceptingOrders &&
     Boolean(selectedAddressId) &&
-    Boolean(selectedSlotId) &&
+    (Boolean(selectedSlotId) || instantSelected) &&
     !isEmpty &&
     !hydrating &&
     !checkingService &&
@@ -136,8 +147,8 @@ export function CheckoutClient({
       setError("Choose a delivery address to continue.");
       return;
     }
-    if (!selectedSlotId) {
-      setError("Choose a delivery slot to continue.");
+    if (!selectedSlotId && !instantSelected) {
+      setError("Choose a delivery option to continue.");
       return;
     }
 
@@ -146,7 +157,8 @@ export function CheckoutClient({
       const result = await submitOrder({
         requestId: requestIdRef.current,
         addressId: selectedAddressId,
-        deliverySlotId: selectedSlotId,
+        // A null delivery slot id means Instant Delivery (no scheduled slot).
+        deliverySlotId: instantSelected ? null : selectedSlotId,
       });
 
       if (!result.ok) {
@@ -281,12 +293,28 @@ export function CheckoutClient({
         </Step>
 
         {/* 2 — Slot */}
-        <Step step={2} title="When should we bring it?" done={Boolean(selectedSlot)}>
+        <Step
+          step={2}
+          title="When should we bring it?"
+          done={Boolean(selectedSlot) || instantSelected}
+        >
           <SlotPicker
             slots={slots}
             load={slotLoad}
             selectedId={selectedSlotId}
-            onSelect={(slot) => setSelectedSlotId(slot.id)}
+            onSelect={(slot) => {
+              setSelectedSlotId(slot.id);
+              setInstantSelected(false);
+            }}
+            instantEnabled={shouldOfferInstantDelivery(
+              instantEnabled ?? false,
+              acceptingOrders,
+            )}
+            instantSelected={instantSelected}
+            onSelectInstant={() => {
+              setInstantSelected(true);
+              setSelectedSlotId(null);
+            }}
           />
         </Step>
 
@@ -313,7 +341,13 @@ export function CheckoutClient({
             </div>
           ) : null}
 
-          {selectedSlot ? (
+          {instantSelected ? (
+            <div className="mb-4 rounded-md border border-line bg-surface-muted px-3 py-2.5 text-small">
+              <p className="text-caption text-ink-subtle">Delivery option</p>
+              <p className="mt-1 text-ink">Instant Delivery</p>
+              <p className="text-ink-muted">Delivered as soon as possible</p>
+            </div>
+          ) : selectedSlot ? (
             <div className="mb-4 rounded-md border border-line bg-surface-muted px-3 py-2.5 text-small">
               <p className="text-caption text-ink-subtle">Delivery slot</p>
               <p className="mt-1 text-ink">

@@ -3,13 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 
+import { ComplaintAttachments, type SignedComplaintAttachment } from "@/components/support/complaint-attachments";
 import { ComplaintReplyBox } from "@/components/support/complaint-form";
 import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { COMPLAINT_STATUS_META, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { ComplaintMessageRow, ComplaintRow } from "@/types/database";
+import type { ComplaintAttachmentRow, ComplaintMessageRow, ComplaintRow } from "@/types/database";
 
 export const metadata: Metadata = {
   title: "Your message",
@@ -18,7 +19,10 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-type Thread = ComplaintRow & { complaint_messages: ComplaintMessageRow[] | null };
+type Thread = ComplaintRow & {
+  complaint_messages: ComplaintMessageRow[] | null;
+  complaint_attachments: ComplaintAttachmentRow[] | null;
+};
 
 /**
  * A single support thread.
@@ -43,7 +47,7 @@ export default async function SupportThreadPage({
   const { data } = await supabase
     .from("complaints")
     .select(
-      `*, complaint_messages ( id, complaint_id, author_id, author_role, body, created_at )`,
+      `*, complaint_messages ( id, complaint_id, author_id, author_role, body, created_at ), complaint_attachments ( id, complaint_id, storage_path, content_type, size )`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -54,6 +58,24 @@ export default async function SupportThreadPage({
   const messages = [...(thread.complaint_messages ?? [])].sort((a, b) =>
     a.created_at.localeCompare(b.created_at),
   );
+
+  // Resolve a short-lived signed URL for each attachment using the user's own
+  // session, so storage RLS applies (owner/admin can sign, nobody else).
+  // A failed sign is skipped gracefully rather than breaking the whole thread.
+  const signedAttachments: SignedComplaintAttachment[] = [];
+  for (const [index, attachment] of (thread.complaint_attachments ?? []).entries()) {
+    const { data: signed, error } = await supabase.storage
+      .from("complaint-images")
+      .createSignedUrl(attachment.storage_path, 3600);
+    if (!error && signed) {
+      signedAttachments.push({
+        id: attachment.id,
+        url: signed.signedUrl,
+        alt: `Photo ${index + 1}`,
+      });
+    }
+  }
+
   const meta = COMPLAINT_STATUS_META[thread.status];
   const closed = thread.status === "CLOSED";
 
@@ -93,6 +115,7 @@ export default async function SupportThreadPage({
         <p className="mt-2 max-w-[68ch] whitespace-pre-line text-body text-ink-muted">
           {thread.description}
         </p>
+        <ComplaintAttachments attachments={signedAttachments} />
         {meta?.description ? (
           <p className="mt-2 text-small text-ink-subtle">{meta.description}</p>
         ) : null}
