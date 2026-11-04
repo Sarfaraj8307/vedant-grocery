@@ -6,6 +6,7 @@ import { AlertCircle, ArrowLeft, HeadphonesIcon, Receipt } from "lucide-react";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { ReorderButton } from "@/components/orders/reorder-button";
 import { CancelOrderPanel } from "@/components/orders/cancel-order-panel";
+import { InstantDeliveryCountdown } from "@/components/orders/instant-delivery-countdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/misc";
@@ -376,6 +377,8 @@ export default async function OrderDetailPage({
                 )}
               </p>
             </div>
+          ) : order.status !== "CANCELLED" ? (
+            <InstantDeliveryCountdown placedAt={order.placed_at} />
           ) : null}
 
           <div className="rounded-lg border border-line bg-surface p-4 shadow-xs">

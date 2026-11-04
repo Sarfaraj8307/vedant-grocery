@@ -11,6 +11,7 @@ import { CartProvider } from "@/components/cart/cart-provider";
 import { ConsentGate } from "@/components/account/consent-gate";
 import { ProfileSync } from "@/components/account/profile-sync";
 import { PwaProvider } from "@/components/pwa/pwa-provider";
+import { OrderNotificationToast } from "@/components/layout/order-notification-toast";
 import { getCategories } from "@/lib/catalogue";
 import { getProfileOrDefault } from "@/lib/auth";
 import { getConsentState } from "@/lib/terms-server";
@@ -157,6 +158,11 @@ export default async function RootLayout({
           {/* Creates the profiles row on first authenticated visit — see
               docs/BACKEND_CONTRACT.md §7.3 (no trigger exists). */}
           {user ? <ProfileSync /> : null}
+
+          {/* Live order notifications over the browser: a toast appears the
+              moment the admin advances an order (confirmed → packed → being
+              delivered). Inert when signed out (no customer). */}
+          {user ? <OrderNotificationToast userId={user.id} /> : null}
 
           {/* Blocks the app until the current terms version is accepted. */}
           {needsConsent ? <ConsentGate needed /> : null}
