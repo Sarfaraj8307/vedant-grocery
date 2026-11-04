@@ -172,7 +172,7 @@ notification_outbox (audience = customer | admin)
 
 **Enums (live):** `order_status` (`PENDING · CONFIRMED · PROCESSING · READY_FOR_DELIVERY · OUT_FOR_DELIVERY · DELIVERED · CANCELLED`), `complaint_status` (`OPEN · IN_PROGRESS · RESOLVED · CLOSED`), `complaint_type`, `user_role` (`customer · admin`), `outbox_audience`, `author_role` (`CUSTOMER · ADMIN`).
 
-**Delivery slots** are generated/maintained by a daily `pg_cron` job (`vedant-delivery-slots`) keeping a **14-day horizon**; the storefront reads a 7-day window (`src/lib/catalogue.ts:205`).
+**Delivery slots** are generated/maintained by a daily `pg_cron` job (`vedant-delivery-slots`, `41 18 * * *` UTC = 00:11 IST) calling `public.auto_ensure_delivery_slots()` → `private.generate_delivery_slots(2)`: a **2-day IST horizon** (today + tomorrow, Morning/Afternoon/Evening, 3 slots/day). The storefront reads the same 2-day window (`getDeliverySlots(horizonDays = 2)` in `src/lib/catalogue.ts`) and renders exactly two day groups (`buildTwoDaySlots` in `src/lib/ist-slots.ts`). Instant Delivery is a checkout option (an order with no `delivery_slot_id`), not a slot row, gated by `store_settings.instant_delivery_enabled`; its ETA comes from `store_settings.instant_delivery_eta_min` / `_max` (default 30–45 mins) and is never hard-coded in JSX.
 
 ### Recommended future enhancement
 - A `products_search` SQL view with a `tsvector` + keyset pagination once the catalogue exceeds a few hundred products (noted in `src/lib/browse.ts`).

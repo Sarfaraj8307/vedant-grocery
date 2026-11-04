@@ -19,7 +19,12 @@ import {
 } from "@/app/checkout/actions";
 import type { ServiceabilityVerdict } from "@/lib/serviceability";
 import { formatSlotWindow } from "@/lib/format";
-import { shouldOfferInstantDelivery } from "@/lib/instant-delivery";
+import {
+  formatInstantDeliveryEta,
+  INSTANT_DELIVERY_ETA_MAX_DEFAULT,
+  INSTANT_DELIVERY_ETA_MIN_DEFAULT,
+  shouldOfferInstantDelivery,
+} from "@/lib/instant-delivery";
 import { cn } from "@/lib/utils";
 import type { AddressRow, DeliverySlotRow } from "@/types/database";
 
@@ -50,6 +55,8 @@ export function CheckoutClient({
   acceptingOrders = true,
   closedReason = null,
   instantEnabled = false,
+  instantEtaMin = INSTANT_DELIVERY_ETA_MIN_DEFAULT,
+  instantEtaMax = INSTANT_DELIVERY_ETA_MAX_DEFAULT,
 }: {
   initialAddresses: AddressRow[];
   slots: DeliverySlotRow[];
@@ -70,6 +77,13 @@ export function CheckoutClient({
    * read error hides the option rather than wrongly offering it.
    */
   instantEnabled?: boolean;
+  /**
+   * Admin-editable Instant Delivery ETA bounds (minutes) read from
+   * `store_settings`. Passed down to the picker so the subtitle is always
+   * derived from the database, never hard-coded.
+   */
+  instantEtaMin?: number;
+  instantEtaMax?: number;
 }) {
   const router = useRouter();
   const { count, isEmpty, hydrating, totals } = useCart();
@@ -130,6 +144,10 @@ export function CheckoutClient({
 
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? null;
   const selectedSlot = slots.find((s) => s.id === selectedSlotId) ?? null;
+
+  // One label, derived from the DB-backed ETA bounds, shared by the picker and
+  // the order summary so they can never disagree.
+  const instantEtaLabel = formatInstantDeliveryEta(instantEtaMin, instantEtaMax);
 
   const readyToPlace =
     acceptingOrders &&
@@ -315,6 +333,8 @@ export function CheckoutClient({
               setInstantSelected(true);
               setSelectedSlotId(null);
             }}
+            etaMin={instantEtaMin}
+            etaMax={instantEtaMax}
           />
         </Step>
 
@@ -345,7 +365,7 @@ export function CheckoutClient({
             <div className="mb-4 rounded-md border border-line bg-surface-muted px-3 py-2.5 text-small">
               <p className="text-caption text-ink-subtle">Delivery option</p>
               <p className="mt-1 text-ink">Instant Delivery</p>
-              <p className="text-ink-muted">Delivered as soon as possible</p>
+              <p className="text-ink-muted">{instantEtaLabel}</p>
             </div>
           ) : selectedSlot ? (
             <div className="mb-4 rounded-md border border-line bg-surface-muted px-3 py-2.5 text-small">

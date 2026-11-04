@@ -205,8 +205,8 @@ export async function getLiveOffers(): Promise<
  *
  * **Slots roll forward by themselves.** Before reading, this calls
  * `auto_ensure_delivery_slots()`, which idempotently materialises the coming
- * days in IST. The window returned here is bounded to a rolling 3-day IST
- * horizon (today, tomorrow, day-after). That is what keeps tomorrow's windows
+ * days in IST. The window returned here is bounded to a rolling 2-day IST
+ * horizon (today and tomorrow). That is what keeps tomorrow's windows
  * appearing every day without anyone pressing a button. The call is
  * best-effort: it needs an authenticated session (staff), so a signed-out
  * shopper simply reads whatever already exists rather than failing the page.
@@ -214,7 +214,7 @@ export async function getLiveOffers(): Promise<
  * window is topped up from either surface.
  */
 export async function getDeliverySlots(
-  horizonDays = 3,
+  horizonDays = 2,
 ): Promise<DeliverySlotRow[]> {
   const supabase = await getSupabaseServerClient();
 
@@ -226,10 +226,10 @@ export async function getDeliverySlots(
     // No session / not staff / transient failure — read what is there.
   }
 
-  // Rolling 3-day IST window: today 00:00 IST … today+horizonDays 00:00 IST
+  // Rolling 2-day IST window: today 00:00 IST … today+horizonDays 00:00 IST
   // (exclusive). Slots are generated in IST, so the window must be anchored to
-  // IST too, not the server's UTC clock — otherwise the day-after would be
-  // cut off or yesterday's slots would leak in around the midnight boundary.
+  // IST too, not the server's UTC clock — otherwise tomorrow would be cut off
+  // or yesterday's slots would leak in around the midnight boundary.
   const now = new Date();
   const todayKey = istDayKey(now);
   const horizonStart = istMidnight(todayKey);

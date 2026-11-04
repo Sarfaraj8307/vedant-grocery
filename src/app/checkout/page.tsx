@@ -49,6 +49,8 @@ export default async function CheckoutPage() {
         acceptingOrders={store.acceptingOrders}
         closedReason={store.closedReason}
         instantEnabled={store.instantDeliveryEnabled}
+        instantEtaMin={store.instantDeliveryEtaMin}
+        instantEtaMax={store.instantDeliveryEtaMax}
       />
     </div>
   );

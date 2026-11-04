@@ -5,7 +5,12 @@ import { CalendarClock, Zap } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/menu";
 import { Badge } from "@/components/ui/badge";
 import { formatSlotRange } from "@/lib/format";
-import { buildThreeDaySlots } from "@/lib/ist-slots";
+import {
+  formatInstantDeliveryEta,
+  INSTANT_DELIVERY_ETA_MAX_DEFAULT,
+  INSTANT_DELIVERY_ETA_MIN_DEFAULT,
+} from "@/lib/instant-delivery";
+import { buildTwoDaySlots } from "@/lib/ist-slots";
 import { cn } from "@/lib/utils";
 import type { DeliverySlotRow } from "@/types/database";
 
@@ -15,11 +20,11 @@ const INSTANT_DELIVERY_VALUE = "__instant__";
 /**
  * Delivery slot picker.
  *
- * Slots are grouped by their IST calendar day (today / tomorrow / day-after)
- * and rendered as radio options. The three days are always shown, so a day
- * with no slots reads "no slots yet" instead of disappearing. When the store
- * offers instant delivery, a leading "Instant Delivery" option appears above
- * the scheduled slots.
+ * Slots are grouped by their IST calendar day (today / tomorrow) and rendered
+ * as radio options. The two days are always shown, so a day with no slots
+ * reads "no slots yet" instead of disappearing. When the store offers instant
+ * delivery, a leading "Instant Delivery" option appears above the scheduled
+ * slots, with its ETA subtitle derived from the admin-editable DB values.
  *
  * Capacity is shown but treated as a hint: the authoritative capacity check
  * happens inside the transaction, and a full slot surfaces as a "delivery slot
@@ -34,6 +39,8 @@ export function SlotPicker({
   instantEnabled = false,
   instantSelected = false,
   onSelectInstant,
+  etaMin = INSTANT_DELIVERY_ETA_MIN_DEFAULT,
+  etaMax = INSTANT_DELIVERY_ETA_MAX_DEFAULT,
   className,
 }: {
   slots: DeliverySlotRow[];
@@ -46,9 +53,19 @@ export function SlotPicker({
   /** Whether Instant Delivery is currently selected. */
   instantSelected?: boolean;
   onSelectInstant?: () => void;
+  /**
+   * Admin-editable Instant Delivery ETA bounds (minutes) from `store_settings`.
+   * The subtitle is derived from these — there is no hard-coded ETA in the JSX.
+   */
+  etaMin?: number;
+  etaMax?: number;
   className?: string;
 }) {
-  const days = React.useMemo(() => buildThreeDaySlots(slots), [slots]);
+  const days = React.useMemo(() => buildTwoDaySlots(slots), [slots]);
+  const instantEtaLabel = React.useMemo(
+    () => formatInstantDeliveryEta(etaMin, etaMax),
+    [etaMin, etaMax],
+  );
 
   const radioValue = instantSelected
     ? INSTANT_DELIVERY_VALUE
@@ -85,7 +102,7 @@ export function SlotPicker({
               Instant Delivery
             </span>
             <span className="mt-0.5 block text-small text-ink-subtle">
-              Delivered as soon as possible
+              {instantEtaLabel}
             </span>
           </span>
         </label>

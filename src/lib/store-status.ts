@@ -1,5 +1,10 @@
 import { cache } from "react";
 
+import {
+  INSTANT_DELIVERY_ETA_MAX_DEFAULT,
+  INSTANT_DELIVERY_ETA_MIN_DEFAULT,
+  normaliseInstantDeliveryEta,
+} from "@/lib/instant-delivery";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -34,6 +39,14 @@ export type StoreStatus = {
    * without a slot has no scheduled slot to fall back on.
    */
   readonly instantDeliveryEnabled: boolean;
+  /**
+   * Admin-editable Instant Delivery ETA bounds (minutes), read from
+   * `store_settings.instant_delivery_eta_min` / `_max`. Missing or invalid
+   * values are normalised to the safe 30 / 45 defaults, so the website never
+   * renders a hard-coded or nonsensical ETA.
+   */
+  readonly instantDeliveryEtaMin: number;
+  readonly instantDeliveryEtaMax: number;
 };
 
 const UNKNOWN: StoreStatus = {
@@ -44,6 +57,8 @@ const UNKNOWN: StoreStatus = {
   freeDeliveryThreshold: null,
   minOrderAmount: null,
   instantDeliveryEnabled: false,
+  instantDeliveryEtaMin: INSTANT_DELIVERY_ETA_MIN_DEFAULT,
+  instantDeliveryEtaMax: INSTANT_DELIVERY_ETA_MAX_DEFAULT,
 };
 
 type StoreSettingsRow = {
@@ -54,6 +69,8 @@ type StoreSettingsRow = {
   free_delivery_threshold: number | null;
   min_order_amount: number | null;
   instant_delivery_enabled: boolean | null;
+  instant_delivery_eta_min: number | null;
+  instant_delivery_eta_max: number | null;
 };
 
 /**
@@ -66,7 +83,7 @@ export const getStoreStatus = cache(async (): Promise<StoreStatus> => {
     const { data, error } = await supabase
       .from("store_settings")
       .select(
-        "is_open, acceptance_reason, store_name, delivery_fee, free_delivery_threshold, min_order_amount, instant_delivery_enabled",
+        "is_open, acceptance_reason, store_name, delivery_fee, free_delivery_threshold, min_order_amount, instant_delivery_enabled, instant_delivery_eta_min, instant_delivery_eta_max",
       )
       .eq("id", 1)
       .maybeSingle();
@@ -74,6 +91,10 @@ export const getStoreStatus = cache(async (): Promise<StoreStatus> => {
     if (error || !data) return UNKNOWN;
 
     const row = data as StoreSettingsRow;
+    const eta = normaliseInstantDeliveryEta(
+      row.instant_delivery_eta_min,
+      row.instant_delivery_eta_max,
+    );
     return {
       // `is_open` is NOT NULL in the database, but a null is treated as open for
       // the same fail-open reason described above.
@@ -84,6 +105,8 @@ export const getStoreStatus = cache(async (): Promise<StoreStatus> => {
       freeDeliveryThreshold: row.free_delivery_threshold,
       minOrderAmount: row.min_order_amount,
       instantDeliveryEnabled: row.instant_delivery_enabled === true,
+      instantDeliveryEtaMin: eta.min,
+      instantDeliveryEtaMax: eta.max,
     };
   } catch {
     return UNKNOWN;
