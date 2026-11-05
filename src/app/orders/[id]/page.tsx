@@ -13,6 +13,8 @@ import { Separator } from "@/components/ui/misc";
 import { requireUser } from "@/lib/auth";
 import { LiveOrderRefresh } from "@/components/orders/live-order-refresh";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getStoreStatus } from "@/lib/store-status";
+import { formatInstantDeliveryEta } from "@/lib/instant-delivery";
 import {
   ORDER_STATUS_FLOW,
   ORDER_STATUS_META,
@@ -89,11 +91,14 @@ export default async function OrderDetailPage({
   const justPlaced = query.placed === "1";
 
   const supabase = await getSupabaseServerClient();
-  const { data } = await supabase
-    .from("orders")
-    .select(ORDER_DETAIL_SELECT)
-    .eq("id", id)
-    .maybeSingle();
+  const [store, { data }] = await Promise.all([
+    getStoreStatus(),
+    supabase
+      .from("orders")
+      .select(ORDER_DETAIL_SELECT)
+      .eq("id", id)
+      .maybeSingle(),
+  ]);
 
   if (!data) notFound();
 
@@ -279,6 +284,28 @@ export default async function OrderDetailPage({
           <h2 className="border-b border-line px-4 py-3 font-display text-h3 text-ink">
             What you ordered
           </h2>
+          {/* The delivery method belongs with the items: the customer sees, in
+              one place, what they bought and how it will arrive (scheduled slot
+              or Instant Delivery). */}
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-4 py-2.5 text-small">
+            <span className="text-ink-muted">Delivery</span>
+            {order.delivery_slot ? (
+              <span className="font-medium text-ink">
+                {formatSlotWindow(
+                  order.delivery_slot.starts_at,
+                  order.delivery_slot.ends_at,
+                )}
+              </span>
+            ) : (
+              <span className="font-medium text-ink">
+                Instant Delivery ·{" "}
+                {formatInstantDeliveryEta(
+                  store.instantDeliveryEtaMin,
+                  store.instantDeliveryEtaMax,
+                )}
+              </span>
+            )}
+          </div>
           <ul className="divide-y divide-line px-4">
             {items.map((item) => (
               <li key={item.id} className="flex items-start justify-between gap-3 py-3">
@@ -378,7 +405,10 @@ export default async function OrderDetailPage({
               </p>
             </div>
           ) : order.status !== "CANCELLED" ? (
-            <InstantDeliveryCountdown placedAt={order.placed_at} />
+            <InstantDeliveryCountdown
+              placedAt={order.placed_at}
+              etaMinutes={store.instantDeliveryEtaMax}
+            />
           ) : null}
 
           <div className="rounded-lg border border-line bg-surface p-4 shadow-xs">

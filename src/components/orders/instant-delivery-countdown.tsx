@@ -3,16 +3,6 @@
 import * as React from "react";
 import { Timer } from "lucide-react";
 
-/**
- * Countdown window for Instant Delivery (minutes).
- *
- * This matches the store's admin-editable ETA **max** default (45 minutes) —
- * the window the customer was shown at checkout. It is the "within 45 minutes"
- * promise the store makes for an express order. A future enhancement could pull
- * `store_settings.instant_delivery_eta_max` here instead of the constant.
- */
-const INSTANT_DELIVERY_WINDOW_MINUTES = 45;
-
 /** Format a remaining duration as mm:ss ("44:59"). */
 function formatRemaining(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -25,21 +15,34 @@ function formatRemaining(ms: number): string {
  * Live countdown for an Instant Delivery order.
  *
  * Runs from the moment the order was placed (`placed_at`) to the express
- * window's end. It ticks once per second. Once the window passes it stops at
- * "00:00" and switches to a calm "still on it" message rather than a nagging
- * zero — the order remains in progress on the tracker.
+ * window's end (the admin-set ETA **max**, default 45 minutes). It ticks once
+ * per second. Once the window passes it stops at "00:00" and switches to a calm
+ * "still on it" message rather than a nagging zero — the order remains in
+ * progress on the tracker.
+ *
+ * When `placedAt` is omitted (e.g. the checkout preview), the countdown is
+ * anchored to the moment the component mounted, so the customer sees the live
+ * clock ticking the moment they select Instant Delivery.
  */
-export function InstantDeliveryCountdown({ placedAt }: { placedAt: string }) {
+export function InstantDeliveryCountdown({
+  placedAt,
+  etaMinutes = 45,
+}: {
+  placedAt?: string;
+  /** The admin-set ETA window in minutes (store_settings.instant_delivery_eta_max). */
+  etaMinutes?: number;
+}) {
   const [now, setNow] = React.useState(() => Date.now());
+  // Stable anchor for the checkout preview (when placedAt is not supplied).
+  const [anchor] = React.useState(() => Date.now());
 
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const deadline =
-    new Date(placedAt).getTime() +
-    INSTANT_DELIVERY_WINDOW_MINUTES * 60_000;
+  const windowMs = Math.max(1, etaMinutes) * 60_000;
+  const deadline = (placedAt ? new Date(placedAt).getTime() : anchor) + windowMs;
   const remaining = deadline - now;
 
   if (remaining <= 0) {
@@ -50,9 +53,9 @@ export function InstantDeliveryCountdown({ placedAt }: { placedAt: string }) {
           <h2 className="font-display text-h3 text-ink">Instant delivery</h2>
         </div>
         <p className="mt-1.5 text-small text-ink-muted">
-          We aim to deliver within {INSTANT_DELIVERY_WINDOW_MINUTES} minutes.
-          If your order has not arrived yet, we are on it — the tracker on this
-          page always shows the latest step.
+          We aim to deliver within {etaMinutes} minutes. If your order has not
+          arrived yet, we are on it — the tracker on this page always shows the
+          latest step.
         </p>
       </div>
     );
@@ -71,8 +74,7 @@ export function InstantDeliveryCountdown({ placedAt }: { placedAt: string }) {
         {formatRemaining(remaining)}
       </p>
       <p className="text-caption text-leaf-800/70">
-        Estimated time left to reach you (within{" "}
-        {INSTANT_DELIVERY_WINDOW_MINUTES} minutes)
+        Estimated time left to reach you (within {etaMinutes} minutes)
       </p>
     </div>
   );

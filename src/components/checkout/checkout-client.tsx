@@ -7,6 +7,7 @@ import { AlertCircle, ArrowRight, Check, ShieldCheck } from "lucide-react";
 
 import { AddressBook } from "@/components/checkout/address-book";
 import { SlotPicker } from "@/components/checkout/slot-picker";
+import { InstantDeliveryCountdown } from "@/components/orders/instant-delivery-countdown";
 import { OrderSummary } from "@/components/cart/order-summary";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/misc";
@@ -362,10 +363,15 @@ export function CheckoutClient({
           ) : null}
 
           {instantSelected ? (
-            <div className="mb-4 rounded-md border border-line bg-surface-muted px-3 py-2.5 text-small">
-              <p className="text-caption text-ink-subtle">Delivery option</p>
-              <p className="mt-1 text-ink">Instant Delivery</p>
-              <p className="text-ink-muted">{instantEtaLabel}</p>
+            <div className="mb-4 flex flex-col gap-2">
+              <div className="rounded-md border border-line bg-surface-muted px-3 py-2.5 text-small">
+                <p className="text-caption text-ink-subtle">Delivery option</p>
+                <p className="mt-1 text-ink">Instant Delivery</p>
+                <p className="text-ink-muted">{instantEtaLabel}</p>
+              </div>
+              {/* A live clock the moment Instant Delivery is selected — ticking
+                  down within the admin-set ETA window. */}
+              <InstantDeliveryCountdown etaMinutes={instantEtaMax} />
             </div>
           ) : selectedSlot ? (
             <div className="mb-4 rounded-md border border-line bg-surface-muted px-3 py-2.5 text-small">
