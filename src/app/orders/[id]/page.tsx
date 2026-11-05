@@ -337,6 +337,18 @@ export default async function OrderDetailPage({
               </li>
             ))}
           </ul>
+          {/* The live countdown lives here, inside the order section: the
+              moment the order is placed the clock starts ticking down the
+              admin-set Instant Delivery ETA, so the customer sees exactly how
+              much time is left. */}
+          {!order.delivery_slot && order.status !== "CANCELLED" ? (
+            <div className="border-t border-line px-4 py-3">
+              <InstantDeliveryCountdown
+                placedAt={order.placed_at}
+                etaMinutes={store.instantDeliveryEtaMax}
+              />
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
             <ReorderButton items={items} redirectToCart={false} className="mt-1" />
             <div className="mt-1">
@@ -405,10 +417,15 @@ export default async function OrderDetailPage({
               </p>
             </div>
           ) : order.status !== "CANCELLED" ? (
-            <InstantDeliveryCountdown
-              placedAt={order.placed_at}
-              etaMinutes={store.instantDeliveryEtaMax}
-            />
+            <div className="rounded-lg border border-line bg-surface p-4 shadow-xs">
+              <h2 className="font-display text-h3 text-ink">Instant delivery</h2>
+              <p className="mt-2 text-small text-ink-muted">
+                {formatInstantDeliveryEta(
+                  store.instantDeliveryEtaMin,
+                  store.instantDeliveryEtaMax,
+                )}
+              </p>
+            </div>
           ) : null}
 
           <div className="rounded-lg border border-line bg-surface p-4 shadow-xs">
